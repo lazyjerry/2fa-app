@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"runtime/debug"
 	"strings"
 	"sync"
 	"time"
@@ -22,6 +23,9 @@ type App struct {
 	storageDir string
 	vault      *VaultData
 	sessionKey []byte
+	// lastCopiedCode 記錄最近一次寫入剪貼簿的驗證碼，用於倒數清空前確認
+	// 剪貼簿內容仍是我們寫入的碼，避免覆蓋使用者期間新複製的內容。
+	lastCopiedCode             string
 	launchScreenshotProtection bool
 }
 
@@ -58,7 +62,8 @@ func (a *App) GetSetupState() (SetupState, error) {
 		UserDataPath:         dir,
 		OSUserScoped:         true,
 		Platform:             runtime.GOOS,
-		BiometricAvailable:   false,
+		BiometricAvailable:   biometricAvailable(),
+		BiometricEnrolled:    biometricEnrolled(),
 		BiometricDescription: biometricStatus(),
 		ScreenshotProtection: contentProtectionAvailable() && a.launchScreenshotProtection,
 	}, nil
@@ -92,8 +97,7 @@ func (a *App) CreateVault(password string) (SessionState, error) {
 		return SessionState{}, err
 	}
 
-	a.vault = vault
-	a.sessionKey = key
+	a.setSessionLocked(vault, key)
 	return a.sessionStateLocked(), nil
 }
 
@@ -109,18 +113,39 @@ func (a *App) UnlockVault(password string) (SessionState, error) {
 	if err != nil {
 		return SessionState{}, errors.New("password is incorrect or vault is damaged")
 	}
-	a.vault = vault
-	a.sessionKey = key
+	a.setSessionLocked(vault, key)
 	return a.sessionStateLocked(), nil
 }
 
 func (a *App) LockVault() error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	a.vault = nil
+	a.clearSessionLocked()
+	// 主動回收：丟掉 vault 參考後立即 GC 並把釋出的頁面歸還 OS，
+	// 縮短明文 secret（無法抹除的 Go string）殘留在 heap 的時間視窗。
+	runtime.GC()
+	debug.FreeOSMemory()
+	return nil
+}
+
+// setSessionLocked 取代目前 session，覆寫前先清掉舊的 key material。
+// 呼叫端必須持有 a.mu。
+func (a *App) setSessionLocked(vault *VaultData, key []byte) {
+	if a.sessionKey != nil {
+		clearBytes(a.sessionKey)
+	}
+	a.vault = vault
+	a.sessionKey = key
+}
+
+// clearSessionLocked 清除記憶體中的 session key 與 vault 參考。
+// sessionKey 為 []byte 可逐位元組歸零；vault 內的 secret 是 Go string，
+// 無法就地抹除，只能丟棄參考交由 GC 回收。呼叫端必須持有 a.mu。
+func (a *App) clearSessionLocked() {
 	clearBytes(a.sessionKey)
 	a.sessionKey = nil
-	return nil
+	a.vault = nil
+	a.lastCopiedCode = ""
 }
 
 func (a *App) GetAccounts() ([]AccountView, error) {
@@ -266,14 +291,41 @@ func (a *App) CopyCode(id string) error {
 	if a.ctx == nil {
 		return errors.New("runtime context is not ready")
 	}
-	return wailsruntime.ClipboardSetText(a.ctx, code)
+	if err := wailsruntime.ClipboardSetText(a.ctx, code); err != nil {
+		return err
+	}
+	a.lastCopiedCode = code
+	return nil
 }
 
+// ClearClipboard 只在剪貼簿內容仍是本程式最後寫入的驗證碼時才清空，
+// 避免覆蓋使用者在倒數期間新複製的其他內容。讀取失敗時保守略過不清空。
 func (a *App) ClearClipboard() error {
 	if a.ctx == nil {
 		return errors.New("runtime context is not ready")
 	}
-	return wailsruntime.ClipboardSetText(a.ctx, "")
+	a.mu.Lock()
+	expected := a.lastCopiedCode
+	a.mu.Unlock()
+	if expected == "" {
+		return nil
+	}
+	current, err := wailsruntime.ClipboardGetText(a.ctx)
+	if err != nil {
+		return err
+	}
+	if current != expected {
+		return nil
+	}
+	if err := wailsruntime.ClipboardSetText(a.ctx, ""); err != nil {
+		return err
+	}
+	a.mu.Lock()
+	if a.lastCopiedCode == expected {
+		a.lastCopiedCode = ""
+	}
+	a.mu.Unlock()
+	return nil
 }
 
 func (a *App) isUnlocked() bool {

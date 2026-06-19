@@ -226,6 +226,7 @@ export namespace main {
 	    osUserScoped: boolean;
 	    platform: string;
 	    biometricAvailable: boolean;
+	    biometricEnrolled: boolean;
 	    biometricDescription: string;
 	    screenshotProtection: boolean;
 	
@@ -241,6 +242,7 @@ export namespace main {
 	        this.osUserScoped = source["osUserScoped"];
 	        this.platform = source["platform"];
 	        this.biometricAvailable = source["biometricAvailable"];
+	        this.biometricEnrolled = source["biometricEnrolled"];
 	        this.biometricDescription = source["biometricDescription"];
 	        this.screenshotProtection = source["screenshotProtection"];
 	    }

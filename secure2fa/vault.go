@@ -99,6 +99,7 @@ func writeEncryptedVault(path string, key []byte, params kdfParams, vault *Vault
 	if err != nil {
 		return err
 	}
+	defer clearBytes(plain) // 明文含全部 secret，封裝後歸零
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		return err
@@ -142,6 +143,7 @@ func decryptVault(file encryptedVault, key []byte) (*VaultData, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer clearBytes(plain) // 解密後的明文含全部 secret，解析完即歸零
 	var vault VaultData
 	if err := json.Unmarshal(plain, &vault); err != nil {
 		return nil, err

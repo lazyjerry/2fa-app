@@ -6,6 +6,8 @@ export function AddAccount(arg1:main.AccountInput):Promise<main.AccountView>;
 
 export function AddAccountFromURI(arg1:main.URIAccountInput):Promise<main.AccountView>;
 
+export function BiometricEnabled():Promise<boolean>;
+
 export function ChangePassword(arg1:string,arg2:string):Promise<void>;
 
 export function ClearClipboard():Promise<void>;
@@ -16,7 +18,13 @@ export function CreateVault(arg1:string):Promise<main.SessionState>;
 
 export function DeleteAccount(arg1:string):Promise<void>;
 
+export function DisableBiometricUnlock():Promise<void>;
+
+export function EnableBiometricUnlock(arg1:string):Promise<void>;
+
 export function ExportVault(arg1:string):Promise<string>;
+
+export function ExportVaultToFile(arg1:string):Promise<string>;
 
 export function GetAccounts():Promise<Array<main.AccountView>>;
 
@@ -26,7 +34,9 @@ export function GetSettings():Promise<main.Settings>;
 
 export function GetSetupState():Promise<main.SetupState>;
 
-export function ImportVault(arg1:string,arg2:string):Promise<main.ImportResult>;
+export function ImportVault(arg1:string):Promise<main.ImportResult>;
+
+export function ImportVaultFromFile():Promise<main.ImportResult>;
 
 export function LockVault():Promise<void>;
 
@@ -35,6 +45,8 @@ export function SaveSettings(arg1:main.Settings):Promise<main.Settings>;
 export function SetLaunchScreenshotProtection(arg1:boolean):Promise<void>;
 
 export function UnlockVault(arg1:string):Promise<main.SessionState>;
+
+export function UnlockWithBiometrics():Promise<main.SessionState>;
 
 export function UpdateAccount(arg1:string,arg2:main.AccountInput):Promise<main.AccountView>;
 

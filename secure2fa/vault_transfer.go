@@ -1,22 +1,23 @@
 package main
 
 import (
-	"crypto/aes"
-	"crypto/cipher"
 	"encoding/json"
 	"errors"
+	"os"
 	"strings"
 	"time"
+
+	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 const exportFormat = "secure2fa-export"
 
-type vaultExport struct {
-	Format  string    `json:"format"`
-	Version int       `json:"version"`
-	KDF     kdfParams `json:"kdf"`
-	Nonce   []byte    `json:"nonce"`
-	Data    []byte    `json:"data"`
+// plainExport 是未加密的明文備份格式：直接包含帳號（含 TOTP secret 明文）。
+type plainExport struct {
+	Format   string    `json:"format"`
+	Version  int       `json:"version"`
+	Exported time.Time `json:"exported"`
+	Accounts []Account `json:"accounts"`
 }
 
 type ImportResult struct {
@@ -67,17 +68,72 @@ func (a *App) ExportVault(password string) (string, error) {
 	if err := a.verifyPasswordLocked(path, password); err != nil {
 		return "", errors.New("password is incorrect")
 	}
-	return encryptExport(password, a.vault)
+	return marshalPlainExport(a.vault)
 }
 
-func (a *App) ImportVault(password, payload string) (ImportResult, error) {
+// ExportVaultToFile 先產生明文備份，再以原生儲存對話框讓使用者選擇位置寫檔。
+// 回傳實際儲存路徑；使用者取消時回傳空字串且不視為錯誤。
+func (a *App) ExportVaultToFile(password string) (string, error) {
+	payload, err := a.ExportVault(password)
+	if err != nil {
+		return "", err
+	}
+
+	if a.ctx == nil {
+		return "", errors.New("runtime context is not ready")
+	}
+	path, err := wailsruntime.SaveFileDialog(a.ctx, wailsruntime.SaveDialogOptions{
+		Title:           "匯出備份",
+		DefaultFilename: "secure2fa-export-" + time.Now().Format("2006-01-02") + ".json",
+		Filters: []wailsruntime.FileFilter{
+			{DisplayName: "JSON 備份檔 (*.json)", Pattern: "*.json"},
+		},
+	})
+	if err != nil {
+		return "", err
+	}
+	if path == "" {
+		return "", nil
+	}
+	if err := os.WriteFile(path, []byte(payload), 0o600); err != nil {
+		return "", err
+	}
+	return path, nil
+}
+
+// ImportVaultFromFile 以原生開檔對話框讓使用者選擇明文備份檔，讀取後匯入。
+// 使用者取消時回傳 Total 為 0 的空結果且不視為錯誤。
+func (a *App) ImportVaultFromFile() (ImportResult, error) {
+	if a.ctx == nil {
+		return ImportResult{}, errors.New("runtime context is not ready")
+	}
+	path, err := wailsruntime.OpenFileDialog(a.ctx, wailsruntime.OpenDialogOptions{
+		Title: "匯入備份",
+		Filters: []wailsruntime.FileFilter{
+			{DisplayName: "JSON 備份檔 (*.json)", Pattern: "*.json"},
+		},
+	})
+	if err != nil {
+		return ImportResult{}, err
+	}
+	if path == "" {
+		return ImportResult{}, nil
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return ImportResult{}, err
+	}
+	return a.ImportVault(string(data))
+}
+
+func (a *App) ImportVault(payload string) (ImportResult, error) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	if err := a.requireUnlockedLocked(); err != nil {
 		return ImportResult{}, err
 	}
 
-	imported, err := decryptExport(password, payload)
+	imported, err := parsePlainExport(payload)
 	if err != nil {
 		return ImportResult{}, err
 	}
@@ -101,31 +157,12 @@ func (a *App) verifyPasswordLocked(path, password string) error {
 	return nil
 }
 
-func encryptExport(password string, vault *VaultData) (string, error) {
-	params := defaultKDF
-	params.Salt = randomBytes(16)
-	key := deriveKey(password, params)
-	defer clearBytes(key)
-
-	plain, err := json.Marshal(vault)
-	if err != nil {
-		return "", err
-	}
-	block, err := aes.NewCipher(key)
-	if err != nil {
-		return "", err
-	}
-	gcm, err := cipher.NewGCM(block)
-	if err != nil {
-		return "", err
-	}
-	nonce := randomBytes(gcm.NonceSize())
-	exp := vaultExport{
-		Format:  exportFormat,
-		Version: 1,
-		KDF:     params,
-		Nonce:   nonce,
-		Data:    gcm.Seal(nil, nonce, plain, nil),
+func marshalPlainExport(vault *VaultData) (string, error) {
+	exp := plainExport{
+		Format:   exportFormat,
+		Version:  1,
+		Exported: time.Now(),
+		Accounts: vault.Accounts,
 	}
 	out, err := json.MarshalIndent(exp, "", "  ")
 	if err != nil {
@@ -134,37 +171,15 @@ func encryptExport(password string, vault *VaultData) (string, error) {
 	return string(out), nil
 }
 
-func decryptExport(password, payload string) (*VaultData, error) {
-	var exp vaultExport
+func parsePlainExport(payload string) (*VaultData, error) {
+	var exp plainExport
 	if err := json.Unmarshal([]byte(payload), &exp); err != nil {
 		return nil, errors.New("export file is not valid")
 	}
 	if exp.Format != exportFormat {
 		return nil, errors.New("unrecognized export format")
 	}
-	if exp.KDF.Name != "argon2id" {
-		return nil, errors.New("unsupported kdf in export file")
-	}
-	key := deriveKey(password, exp.KDF)
-	defer clearBytes(key)
-
-	block, err := aes.NewCipher(key)
-	if err != nil {
-		return nil, err
-	}
-	gcm, err := cipher.NewGCM(block)
-	if err != nil {
-		return nil, err
-	}
-	plain, err := gcm.Open(nil, exp.Nonce, exp.Data, nil)
-	if err != nil {
-		return nil, errors.New("password is incorrect or export is damaged")
-	}
-	var vault VaultData
-	if err := json.Unmarshal(plain, &vault); err != nil {
-		return nil, err
-	}
-	return &vault, nil
+	return &VaultData{Accounts: exp.Accounts}, nil
 }
 
 func mergeAccounts(vault *VaultData, incoming []Account) ImportResult {

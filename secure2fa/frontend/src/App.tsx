@@ -1,7 +1,6 @@
 import {FormEvent, useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import jsQR from 'jsqr';
 import {
-    Camera,
     Check,
     Copy,
     Eye,
@@ -21,6 +20,7 @@ import Select from 'react-select';
 import CreatableSelect from 'react-select/creatable';
 import {StylesConfig} from 'react-select';
 import './App.css';
+import frontendPackage from '../package.json';
 import {
     AddAccount,
     AddAccountFromURI,
@@ -29,22 +29,29 @@ import {
     CopyCode,
     CreateVault,
     DeleteAccount,
-    ExportVault,
+    DisableBiometricUnlock,
+    EnableBiometricUnlock,
+    ExportVaultToFile,
     GetCodes,
     GetSetupState,
     GetSettings,
-    ImportVault,
+    ImportVaultFromFile,
     LockVault,
     SaveSettings,
     UnlockVault,
+    UnlockWithBiometrics,
     UpdateAccount,
     ValidateSecret
 } from '../wailsjs/go/main/App';
 import {main} from '../wailsjs/go/models';
 
 type Tab = 'codes' | 'add' | 'settings';
-type SecurityMode = 'change' | 'export' | 'import' | null;
-type AddMode = 'image' | 'uri' | 'camera' | 'manual';
+type SecurityMode = 'change' | 'export' | 'biometric' | null;
+type AddMode = 'image' | 'uri' | 'manual';
+
+// Touch ID 需正式簽章發布版本（簽章 + keychain entitlements）才能存取受生物驗證
+// 保護的 Keychain；開發版暫時唯讀。發布版本時改為 true 即可恢復實際解鎖流程。
+const biometricReleaseReady = false;
 
 const emptyForm = {
     issuer: '',
@@ -145,7 +152,6 @@ function App() {
     const [uriInput, setUriInput] = useState('');
     const [addMode, setAddMode] = useState<AddMode>('image');
     const [editingID, setEditingID] = useState<string | null>(null);
-    const [cameraOpen, setCameraOpen] = useState(false);
     const [privacyBlur, setPrivacyBlur] = useState(false);
     const [confirmOpen, setConfirmOpen] = useState(false);
     const [confirmMessage, setConfirmMessage] = useState('');
@@ -153,10 +159,9 @@ function App() {
     const [secCurrentPw, setSecCurrentPw] = useState('');
     const [secNewPw, setSecNewPw] = useState('');
     const [secConfirmPw, setSecConfirmPw] = useState('');
-    const [importPayload, setImportPayload] = useState('');
-    const [importFileName, setImportFileName] = useState('');
     const [secretCheck, setSecretCheck] = useState<main.SecretCheck | null>(null);
     const idleTimer = useRef<number | null>(null);
+    const clipboardTimer = useRef<number | null>(null);
     const confirmResolver = useRef<((value: boolean) => void) | null>(null);
 
     function requestConfirm(message: string) {
@@ -254,6 +259,26 @@ function App() {
         }
     }
 
+    function notifyBiometricUnavailable() {
+        setNotice('');
+        setError('Touch ID 解鎖需正式簽章發布版本（含 keychain entitlements）才能使用，開發版暫不支援。');
+    }
+
+    async function unlockWithTouchID() {
+        setError('');
+        setNotice('');
+        try {
+            await UnlockWithBiometrics();
+            setPassword('');
+            setConfirmPassword('');
+            setUnlocked(true);
+            await refreshSetup();
+            await refreshVault();
+        } catch (err) {
+            setError(String(err));
+        }
+    }
+
     async function handleLock() {
         await LockVault();
         setUnlocked(false);
@@ -286,7 +311,7 @@ function App() {
                 return;
             }
 
-            const isUriMode = addMode === 'uri' || addMode === 'image' || addMode === 'camera';
+            const isUriMode = addMode === 'uri' || addMode === 'image';
             if (isUriMode) {
                 const uri = uriInput.trim();
                 if (!uri) {
@@ -394,8 +419,12 @@ function App() {
             await CopyCode(id);
             setNotice('驗證碼已複製');
             if (settings?.clipboardClearSeconds) {
-                window.setTimeout(() => {
+                // 只保留最新一次複製的計時器，避免多次複製堆疊出多個提前清空。
+                // 後端 ClearClipboard 仍會再次確認剪貼簿內容才清空。
+                if (clipboardTimer.current) window.clearTimeout(clipboardTimer.current);
+                clipboardTimer.current = window.setTimeout(() => {
                     ClearClipboard().catch(() => undefined);
+                    clipboardTimer.current = null;
                 }, settings.clipboardClearSeconds * 1000);
             }
         } catch (err) {
@@ -440,8 +469,6 @@ function App() {
         setSecCurrentPw('');
         setSecNewPw('');
         setSecConfirmPw('');
-        setImportPayload('');
-        setImportFileName('');
         setSecurityMode(mode);
     }
 
@@ -450,8 +477,6 @@ function App() {
         setSecCurrentPw('');
         setSecNewPw('');
         setSecConfirmPw('');
-        setImportPayload('');
-        setImportFileName('');
     }
 
     async function submitChangePassword(event: FormEvent<HTMLFormElement>) {
@@ -474,44 +499,54 @@ function App() {
         event.preventDefault();
         setError('');
         try {
-            const payload = await ExportVault(secCurrentPw);
-            const blob = new Blob([payload], {type: 'application/json'});
-            const url = URL.createObjectURL(blob);
-            const anchor = document.createElement('a');
-            anchor.href = url;
-            anchor.download = `secure2fa-export-${new Date().toISOString().slice(0, 10)}.json`;
-            anchor.click();
-            URL.revokeObjectURL(url);
+            const savedPath = await ExportVaultToFile(secCurrentPw);
             closeSecurity();
-            setNotice('已匯出加密備份檔');
+            if (savedPath) {
+                setNotice(`已匯出加密備份檔：${savedPath}`);
+            } else {
+                setNotice('已取消匯出');
+            }
         } catch (err) {
             setError(String(err));
         }
     }
 
-    async function loadImportFile(file: File) {
+    async function runImport() {
         setError('');
+        setNotice('');
         try {
-            const text = await file.text();
-            setImportPayload(text);
-            setImportFileName(file.name);
+            const result = await ImportVaultFromFile();
+            if (result.total === 0) {
+                setNotice('已取消匯入');
+                return;
+            }
+            await refreshVault();
+            setNotice(`匯入完成：新增 ${result.added}、略過重複 ${result.skipped}`);
         } catch (err) {
             setError(String(err));
         }
     }
 
-    async function submitImport(event: FormEvent<HTMLFormElement>) {
+    async function submitEnableBiometric(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
         setError('');
-        if (!importPayload) {
-            setError('請先選擇要匯入的備份檔');
-            return;
-        }
         try {
-            const result = await ImportVault(secCurrentPw, importPayload);
-            await refreshVault();
+            await EnableBiometricUnlock(secCurrentPw);
             closeSecurity();
-            setNotice(`匯入完成：新增 ${result.added}、略過重複 ${result.skipped}`);
+            await refreshSetup();
+            setNotice('已啟用 Touch ID 解鎖');
+        } catch (err) {
+            setError(String(err));
+        }
+    }
+
+    async function disableBiometric() {
+        setError('');
+        setNotice('');
+        try {
+            await DisableBiometricUnlock();
+            await refreshSetup();
+            setNotice('已停用 Touch ID 解鎖');
         } catch (err) {
             setError(String(err));
         }
@@ -573,6 +608,13 @@ function App() {
                             <Lock size={17}/>
                             {setup?.hasVault ? '解鎖' : '建立保險庫'}
                         </button>
+                        {setup?.hasVault && biometricReleaseReady && setup.biometricAvailable && setup.biometricEnrolled && (
+                            <button type="button"
+                                    className="plain-action biometric-unlock"
+                                    onClick={unlockWithTouchID}>
+                                使用 Touch ID 解鎖
+                            </button>
+                        )}
                     </form>
                     <div className="security-list">
                         <span>OS 使用者隔離：{setup?.osUserScoped ? '啟用' : '未啟用'}</span>
@@ -591,7 +633,7 @@ function App() {
                     <Shield size={25}/>
                     <div>
                         <strong>Secure 2FA</strong>
-                        <span>{setup.platform}</span>
+                        <span className="brand-version">{frontendPackage.version}</span>
                     </div>
                 </div>
                 <nav className="nav-stack">
@@ -700,13 +742,6 @@ function App() {
                                     <button type="button" className={addMode === 'uri' ? 'active' : ''}
                                             onClick={() => setAddMode('uri')}>URI
                                     </button>
-                                    <button type="button" className={addMode === 'camera' ? 'active' : ''}
-                                            onClick={() => {
-                                                setAddMode('camera');
-                                                setCameraOpen(true);
-                                            }}>
-                                        鏡頭
-                                    </button>
                                     <button type="button" className={addMode === 'manual' ? 'active' : ''}
                                             onClick={() => setAddMode('manual')}>手動
                                     </button>
@@ -774,26 +809,6 @@ function App() {
                                                     onClick={importImageFromClipboard}
                                                 >
                                                     從剪貼簿貼上
-                                                </button>
-                                            </div>
-                                        </>
-                                    ) : addMode === 'camera' ? (
-                                        <>
-                                            <label className="wide">
-                                                <span>鏡頭掃描結果（otpauth URI）</span>
-                                                <textarea
-                                                    value={uriInput}
-                                                    readOnly
-                                                    placeholder="按下方按鈕開啟鏡頭掃描"
-                                                />
-                                            </label>
-                                            <div className="form-actions wide">
-                                                <button
-                                                    type="button"
-                                                    className="plain-action"
-                                                    onClick={() => setCameraOpen(true)}
-                                                >
-                                                    <Camera size={16}/> 開啟鏡頭掃描
                                                 </button>
                                             </div>
                                         </>
@@ -924,10 +939,19 @@ function App() {
                         </div>
                         <div className="setting-row">
                             <div>
-                                <strong>生物驗證</strong>
-                                <span>{setup.biometricDescription}</span>
+                                <strong>Touch ID 解鎖</strong>
+                                <span>{biometricReleaseReady ? setup.biometricDescription : '需正式簽章發布版本（簽章 + keychain entitlements）才能使用，開發版暫停用。'}</span>
                             </div>
-                            <span className="pill">{setup.biometricAvailable ? '可用' : '未接入'}</span>
+                            {!biometricReleaseReady ? (
+                                <button className="plain-action readonly-action" title="需正式發布版本才能使用"
+                                        onClick={notifyBiometricUnavailable}>啟用</button>
+                            ) : !setup.biometricAvailable ? (
+                                <span className="pill">未支援</span>
+                            ) : setup.biometricEnrolled ? (
+                                <button className="plain-action" onClick={disableBiometric}>停用</button>
+                            ) : (
+                                <button className="plain-action" onClick={() => openSecurity('biometric')}>啟用</button>
+                            )}
                         </div>
                         <div className="setting-row">
                             <div>
@@ -946,11 +970,11 @@ function App() {
                         <div className="setting-row">
                             <div>
                                 <strong>備份與還原</strong>
-                                <span>匯出為加密備份檔，或從備份檔匯入帳號（重複帳號會自動略過）。</span>
+                                <span>匯出為明文 JSON 備份檔，或從備份檔匯入帳號（重複帳號會自動略過）。</span>
                             </div>
                             <div className="setting-actions">
                                 <button className="plain-action" onClick={() => openSecurity('export')}>匯出</button>
-                                <button className="plain-action" onClick={() => openSecurity('import')}>匯入</button>
+                                <button className="plain-action" onClick={runImport}>匯入</button>
                             </div>
                         </div>
                     </section>
@@ -986,8 +1010,8 @@ function App() {
                 {securityMode === 'export' && (
                     <div className="modal-backdrop">
                         <section className="confirm-modal">
-                            <h2>匯出加密備份</h2>
-                            <p>請再次輸入主密碼以確認身分，匯出檔將以該密碼加密。</p>
+                            <h2>匯出備份</h2>
+                            <p>請再次輸入主密碼以確認身分。匯出檔為<strong>未加密的明文 JSON</strong>，內含所有帳號的 TOTP secret，請妥善保管並用完即刪。</p>
                             <form className="account-form" onSubmit={submitExport}>
                                 <label>
                                     <span>主密碼</span>
@@ -1002,29 +1026,20 @@ function App() {
                         </section>
                     </div>
                 )}
-                {securityMode === 'import' && (
+                {securityMode === 'biometric' && (
                     <div className="modal-backdrop">
                         <section className="confirm-modal">
-                            <h2>從備份匯入</h2>
-                            <p>選擇先前匯出的備份檔，並輸入該檔案的加密密碼。</p>
-                            <form className="account-form" onSubmit={submitImport}>
+                            <h2>啟用 Touch ID 解鎖</h2>
+                            <p>輸入主密碼以授權；主密碼將存入受 Touch ID 保護的 macOS Keychain。</p>
+                            <form className="account-form" onSubmit={submitEnableBiometric}>
                                 <label>
-                                    <span>備份檔</span>
-                                    <input type="file" accept="application/json,.json"
-                                           onChange={(event) => {
-                                               const file = event.target.files?.[0];
-                                               if (file) loadImportFile(file);
-                                           }}/>
-                                    {importFileName && <small>{importFileName}</small>}
-                                </label>
-                                <label>
-                                    <span>備份檔密碼</span>
-                                    <input type="password" value={secCurrentPw}
+                                    <span>主密碼</span>
+                                    <input type="password" value={secCurrentPw} autoFocus
                                            onChange={(event) => setSecCurrentPw(event.target.value)} required/>
                                 </label>
                                 <div className="form-actions">
                                     <button type="button" className="plain-action" onClick={closeSecurity}>取消</button>
-                                    <button type="submit" className="primary-action">匯入</button>
+                                    <button type="submit" className="primary-action">啟用</button>
                                 </div>
                             </form>
                         </section>
@@ -1102,13 +1117,6 @@ function App() {
                     </div>
                 )}
             </section>
-            {cameraOpen && <ScannerModal onClose={() => setCameraOpen(false)} onDetected={(uri) => {
-                setUriInput(uri);
-                setTab('add');
-                setAddMode('camera');
-                setNotice('已掃描 QRCode');
-                setCameraOpen(false);
-            }}/>}
         </main>
     );
 }
@@ -1137,76 +1145,6 @@ async function extractOtpauthFromImageBlob(blob: Blob) {
     } finally {
         bitmap.close();
     }
-}
-
-function ScannerModal({onClose, onDetected}: { onClose: () => void; onDetected: (uri: string) => void }) {
-    const videoRef = useRef<HTMLVideoElement | null>(null);
-    const canvasRef = useRef<HTMLCanvasElement | null>(null);
-    const streamRef = useRef<MediaStream | null>(null);
-    const frameRef = useRef<number | null>(null);
-    const [status, setStatus] = useState('等待相機權限');
-
-    useEffect(() => {
-        let active = true;
-
-        async function start() {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({video: {facingMode: 'environment'}, audio: false});
-                streamRef.current = stream;
-                if (!videoRef.current) return;
-                videoRef.current.srcObject = stream;
-                await videoRef.current.play();
-                setStatus('掃描 otpauth QR code');
-                scan();
-            } catch (err) {
-                setStatus(`相機無法使用：${cleanError(String(err))}`);
-            }
-        }
-
-        function scan() {
-            if (!active || !videoRef.current || !canvasRef.current) return;
-            const video = videoRef.current;
-            const canvas = canvasRef.current;
-            const context = canvas.getContext('2d', {willReadFrequently: true});
-            if (context && video.videoWidth && video.videoHeight) {
-                canvas.width = video.videoWidth;
-                canvas.height = video.videoHeight;
-                context.drawImage(video, 0, 0, canvas.width, canvas.height);
-                const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-                const code = jsQR(imageData.data, imageData.width, imageData.height);
-                if (code?.data?.startsWith('otpauth://')) {
-                    onDetected(code.data);
-                    return;
-                }
-            }
-            frameRef.current = requestAnimationFrame(scan);
-        }
-
-        start();
-        return () => {
-            active = false;
-            if (frameRef.current) cancelAnimationFrame(frameRef.current);
-            streamRef.current?.getTracks().forEach((track) => track.stop());
-        };
-    }, [onDetected]);
-
-    return (
-        <div className="modal-backdrop">
-            <section className="scanner-modal">
-                <div className="card-head">
-                    <div>
-                        <h2>掃描 QR code</h2>
-                        <p>{status}</p>
-                    </div>
-                    <button className="icon-action" onClick={onClose} title="關閉">
-                        <X size={19}/>
-                    </button>
-                </div>
-                <video ref={videoRef} muted playsInline/>
-                <canvas ref={canvasRef} hidden/>
-            </section>
-        </div>
-    );
 }
 
 function groupCode(code: string) {

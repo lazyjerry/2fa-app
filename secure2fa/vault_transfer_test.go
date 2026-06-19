@@ -67,10 +67,7 @@ func TestExportImportRoundTrip(t *testing.T) {
 		t.Fatalf("CreateVault() error = %v", err)
 	}
 
-	if _, err := dest.ImportVault("wrong password", payload); err == nil {
-		t.Fatal("ImportVault() should reject an incorrect password")
-	}
-	result, err := dest.ImportVault(testPassword, payload)
+	result, err := dest.ImportVault(payload)
 	if err != nil {
 		t.Fatalf("ImportVault() error = %v", err)
 	}
@@ -79,7 +76,7 @@ func TestExportImportRoundTrip(t *testing.T) {
 	}
 
 	// Re-importing the same payload must skip the duplicate.
-	again, err := dest.ImportVault(testPassword, payload)
+	again, err := dest.ImportVault(payload)
 	if err != nil {
 		t.Fatalf("ImportVault() second call error = %v", err)
 	}
@@ -106,7 +103,7 @@ func TestExportImportRoundTrip(t *testing.T) {
 
 func TestImportRejectsCorruptPayload(t *testing.T) {
 	app := newUnlockedApp(t)
-	if _, err := app.ImportVault(testPassword, "{not a real export}"); err == nil {
+	if _, err := app.ImportVault("{not a real export}"); err == nil {
 		t.Fatal("ImportVault() should reject a corrupt payload")
 	}
 }

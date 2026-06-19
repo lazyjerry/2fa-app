@@ -9,6 +9,7 @@ type SetupState struct {
 	OSUserScoped         bool   `json:"osUserScoped"`
 	Platform             string `json:"platform"`
 	BiometricAvailable   bool   `json:"biometricAvailable"`
+	BiometricEnrolled    bool   `json:"biometricEnrolled"`
 	BiometricDescription string `json:"biometricDescription"`
 	ScreenshotProtection bool   `json:"screenshotProtection"`
 }

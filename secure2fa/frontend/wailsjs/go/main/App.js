@@ -10,6 +10,10 @@ export function AddAccountFromURI(arg1) {
   return window['go']['main']['App']['AddAccountFromURI'](arg1);
 }
 
+export function BiometricEnabled() {
+  return window['go']['main']['App']['BiometricEnabled']();
+}
+
 export function ChangePassword(arg1, arg2) {
   return window['go']['main']['App']['ChangePassword'](arg1, arg2);
 }
@@ -30,8 +34,20 @@ export function DeleteAccount(arg1) {
   return window['go']['main']['App']['DeleteAccount'](arg1);
 }
 
+export function DisableBiometricUnlock() {
+  return window['go']['main']['App']['DisableBiometricUnlock']();
+}
+
+export function EnableBiometricUnlock(arg1) {
+  return window['go']['main']['App']['EnableBiometricUnlock'](arg1);
+}
+
 export function ExportVault(arg1) {
   return window['go']['main']['App']['ExportVault'](arg1);
+}
+
+export function ExportVaultToFile(arg1) {
+  return window['go']['main']['App']['ExportVaultToFile'](arg1);
 }
 
 export function GetAccounts() {
@@ -50,8 +66,12 @@ export function GetSetupState() {
   return window['go']['main']['App']['GetSetupState']();
 }
 
-export function ImportVault(arg1, arg2) {
-  return window['go']['main']['App']['ImportVault'](arg1, arg2);
+export function ImportVault(arg1) {
+  return window['go']['main']['App']['ImportVault'](arg1);
+}
+
+export function ImportVaultFromFile() {
+  return window['go']['main']['App']['ImportVaultFromFile']();
 }
 
 export function LockVault() {
@@ -68,6 +88,10 @@ export function SetLaunchScreenshotProtection(arg1) {
 
 export function UnlockVault(arg1) {
   return window['go']['main']['App']['UnlockVault'](arg1);
+}
+
+export function UnlockWithBiometrics() {
+  return window['go']['main']['App']['UnlockWithBiometrics']();
 }
 
 export function UpdateAccount(arg1, arg2) {

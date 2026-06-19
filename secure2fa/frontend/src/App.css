@@ -69,7 +69,6 @@
 .account-form,
 .settings-view,
 .code-row,
-.scanner-modal,
 .edit-modal,
 .confirm-modal {
     position: relative;
@@ -87,7 +86,6 @@
 .account-form::before,
 .settings-view::before,
 .code-row::before,
-.scanner-modal::before,
 .edit-modal::before,
 .confirm-modal::before {
     content: "";
@@ -154,6 +152,15 @@
 
 .auth-form {
     margin-top: 28px;
+}
+
+.biometric-unlock {
+    justify-content: center;
+}
+
+.readonly-action {
+    opacity: 0.5;
+    cursor: not-allowed;
 }
 
 label {
@@ -429,6 +436,11 @@ button {
     letter-spacing: 0.09em;
 }
 
+.brand-row.compact .brand-version {
+    font-size: 10px;
+    letter-spacing: 0.04em;
+}
+
 .nav-stack {
     display: grid;
     gap: 2px;
@@ -564,7 +576,7 @@ button {
 
 .segmented {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(3, 1fr);
     gap: 6px;
 }
 
@@ -927,7 +939,7 @@ button {
 
 .toast {
     position: fixed;
-    right: 22px;
+    left: 22px;
     bottom: 22px;
     z-index: 70;
     max-width: min(420px, calc(100vw - 44px));
@@ -956,11 +968,6 @@ button {
     backdrop-filter: blur(8px);
 }
 
-.scanner-modal {
-    width: min(720px, 100%);
-    padding: 16px;
-}
-
 .edit-modal {
     width: min(760px, 100%);
     padding: 16px;
@@ -984,16 +991,6 @@ button {
 .confirm-modal p {
     margin: 0;
     color: rgba(255, 255, 255, 0.72);
-}
-
-.scanner-modal video {
-    width: 100%;
-    aspect-ratio: 16 / 10;
-    margin-top: 14px;
-    border-radius: 0;
-    object-fit: cover;
-    background: #020617;
-    border: 1px solid var(--hud-line-soft);
 }
 
 @media (max-width: 900px) {

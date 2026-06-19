@@ -1,10 +1,10 @@
 package main
 
 import (
-    "encoding/json"
-    "errors"
-    "os"
-    "path/filepath"
+	"encoding/json"
+	"errors"
+	"os"
+	"path/filepath"
 )
 
 const launchSettingsFileName = "launch_settings.json"

@@ -9,7 +9,7 @@
 - Vault 內容以 Argon2id 衍生金鑰，AES-GCM 加密儲存在本機。
 - OS 使用者隔離：預設資料位置由 `os.UserConfigDir()` 決定。
 - 帳號管理：新增、編輯 metadata、刪除、搜尋、分類、備註。
-- 匯入方式：手動 secret、`otpauth://` URI、鏡頭 QR 掃描。
+- 匯入方式：手動 secret、`otpauth://` URI、圖片貼上。
 - 複製驗證碼與可設定剪貼簿清空秒數。
 - 設定頁：遮蔽驗證碼、自動鎖定、剪貼簿清空、截圖防護狀態、資料目錄。
 - macOS/Windows Wails `ContentProtection` 已啟用。

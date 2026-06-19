@@ -6,6 +6,8 @@ export function AddAccount(arg1:main.AccountInput):Promise<main.AccountView>;
 
 export function AddAccountFromURI(arg1:main.URIAccountInput):Promise<main.AccountView>;
 
+export function ChangePassword(arg1:string,arg2:string):Promise<void>;
+
 export function ClearClipboard():Promise<void>;
 
 export function CopyCode(arg1:string):Promise<void>;
@@ -14,6 +16,8 @@ export function CreateVault(arg1:string):Promise<main.SessionState>;
 
 export function DeleteAccount(arg1:string):Promise<void>;
 
+export function ExportVault(arg1:string):Promise<string>;
+
 export function GetAccounts():Promise<Array<main.AccountView>>;
 
 export function GetCodes():Promise<Array<main.CodeView>>;
@@ -21,6 +25,8 @@ export function GetCodes():Promise<Array<main.CodeView>>;
 export function GetSettings():Promise<main.Settings>;
 
 export function GetSetupState():Promise<main.SetupState>;
+
+export function ImportVault(arg1:string,arg2:string):Promise<main.ImportResult>;
 
 export function LockVault():Promise<void>;
 
@@ -31,3 +37,5 @@ export function SetLaunchScreenshotProtection(arg1:boolean):Promise<void>;
 export function UnlockVault(arg1:string):Promise<main.SessionState>;
 
 export function UpdateAccount(arg1:string,arg2:main.AccountInput):Promise<main.AccountView>;
+
+export function ValidateSecret(arg1:string):Promise<main.SecretCheck>;

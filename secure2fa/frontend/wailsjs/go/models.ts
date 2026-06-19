@@ -130,6 +130,40 @@ export namespace main {
 		    return a;
 		}
 	}
+	export class ImportResult {
+	    added: number;
+	    skipped: number;
+	    total: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new ImportResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.added = source["added"];
+	        this.skipped = source["skipped"];
+	        this.total = source["total"];
+	    }
+	}
+	export class SecretCheck {
+	    empty: boolean;
+	    valid: boolean;
+	    duplicate: boolean;
+	    duplicateLabel: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new SecretCheck(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.empty = source["empty"];
+	        this.valid = source["valid"];
+	        this.duplicate = source["duplicate"];
+	        this.duplicateLabel = source["duplicateLabel"];
+	    }
+	}
 	export class Settings {
 	    maskCodes: boolean;
 	    autoLockSeconds: number;

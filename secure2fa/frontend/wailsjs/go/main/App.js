@@ -10,6 +10,10 @@ export function AddAccountFromURI(arg1) {
   return window['go']['main']['App']['AddAccountFromURI'](arg1);
 }
 
+export function ChangePassword(arg1, arg2) {
+  return window['go']['main']['App']['ChangePassword'](arg1, arg2);
+}
+
 export function ClearClipboard() {
   return window['go']['main']['App']['ClearClipboard']();
 }
@@ -26,6 +30,10 @@ export function DeleteAccount(arg1) {
   return window['go']['main']['App']['DeleteAccount'](arg1);
 }
 
+export function ExportVault(arg1) {
+  return window['go']['main']['App']['ExportVault'](arg1);
+}
+
 export function GetAccounts() {
   return window['go']['main']['App']['GetAccounts']();
 }
@@ -40,6 +48,10 @@ export function GetSettings() {
 
 export function GetSetupState() {
   return window['go']['main']['App']['GetSetupState']();
+}
+
+export function ImportVault(arg1, arg2) {
+  return window['go']['main']['App']['ImportVault'](arg1, arg2);
 }
 
 export function LockVault() {
@@ -60,4 +72,8 @@ export function UnlockVault(arg1) {
 
 export function UpdateAccount(arg1, arg2) {
   return window['go']['main']['App']['UpdateAccount'](arg1, arg2);
+}
+
+export function ValidateSecret(arg1) {
+  return window['go']['main']['App']['ValidateSecret'](arg1);
 }

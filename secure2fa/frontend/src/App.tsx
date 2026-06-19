@@ -24,21 +24,26 @@ import './App.css';
 import {
     AddAccount,
     AddAccountFromURI,
+    ChangePassword,
     ClearClipboard,
     CopyCode,
     CreateVault,
     DeleteAccount,
+    ExportVault,
     GetCodes,
     GetSetupState,
     GetSettings,
+    ImportVault,
     LockVault,
     SaveSettings,
     UnlockVault,
-    UpdateAccount
+    UpdateAccount,
+    ValidateSecret
 } from '../wailsjs/go/main/App';
 import {main} from '../wailsjs/go/models';
 
 type Tab = 'codes' | 'add' | 'settings';
+type SecurityMode = 'change' | 'export' | 'import' | null;
 type AddMode = 'image' | 'uri' | 'camera' | 'manual';
 
 const emptyForm = {
@@ -144,6 +149,13 @@ function App() {
     const [privacyBlur, setPrivacyBlur] = useState(false);
     const [confirmOpen, setConfirmOpen] = useState(false);
     const [confirmMessage, setConfirmMessage] = useState('');
+    const [securityMode, setSecurityMode] = useState<SecurityMode>(null);
+    const [secCurrentPw, setSecCurrentPw] = useState('');
+    const [secNewPw, setSecNewPw] = useState('');
+    const [secConfirmPw, setSecConfirmPw] = useState('');
+    const [importPayload, setImportPayload] = useState('');
+    const [importFileName, setImportFileName] = useState('');
+    const [secretCheck, setSecretCheck] = useState<main.SecretCheck | null>(null);
     const idleTimer = useRef<number | null>(null);
     const confirmResolver = useRef<((value: boolean) => void) | null>(null);
 
@@ -250,6 +262,19 @@ function App() {
         setPassword('');
     }
 
+    async function onSecretChange(value: string) {
+        setForm((prev) => ({...prev, secret: value}));
+        if (!value.trim()) {
+            setSecretCheck(null);
+            return;
+        }
+        try {
+            setSecretCheck(await ValidateSecret(value));
+        } catch {
+            setSecretCheck(null);
+        }
+    }
+
     async function submitAccount(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
         setError('');
@@ -282,6 +307,7 @@ function App() {
                 await AddAccount({...form, notes});
             }
             setForm({...emptyForm});
+            setSecretCheck(null);
             await refreshVault();
             setTab('codes');
             setCategory('all');
@@ -406,6 +432,89 @@ function App() {
         const saved = await SaveSettings(next);
         setSettings(saved);
         setNotice(restartRequired ? '設定已更新，請重新啟動 APP 套用截圖防護變更。' : '設定已更新');
+    }
+
+    function openSecurity(mode: Exclude<SecurityMode, null>) {
+        setError('');
+        setNotice('');
+        setSecCurrentPw('');
+        setSecNewPw('');
+        setSecConfirmPw('');
+        setImportPayload('');
+        setImportFileName('');
+        setSecurityMode(mode);
+    }
+
+    function closeSecurity() {
+        setSecurityMode(null);
+        setSecCurrentPw('');
+        setSecNewPw('');
+        setSecConfirmPw('');
+        setImportPayload('');
+        setImportFileName('');
+    }
+
+    async function submitChangePassword(event: FormEvent<HTMLFormElement>) {
+        event.preventDefault();
+        setError('');
+        if (secNewPw !== secConfirmPw) {
+            setError('兩次輸入的新密碼不一致');
+            return;
+        }
+        try {
+            await ChangePassword(secCurrentPw, secNewPw);
+            closeSecurity();
+            setNotice('主密碼已變更');
+        } catch (err) {
+            setError(String(err));
+        }
+    }
+
+    async function submitExport(event: FormEvent<HTMLFormElement>) {
+        event.preventDefault();
+        setError('');
+        try {
+            const payload = await ExportVault(secCurrentPw);
+            const blob = new Blob([payload], {type: 'application/json'});
+            const url = URL.createObjectURL(blob);
+            const anchor = document.createElement('a');
+            anchor.href = url;
+            anchor.download = `secure2fa-export-${new Date().toISOString().slice(0, 10)}.json`;
+            anchor.click();
+            URL.revokeObjectURL(url);
+            closeSecurity();
+            setNotice('已匯出加密備份檔');
+        } catch (err) {
+            setError(String(err));
+        }
+    }
+
+    async function loadImportFile(file: File) {
+        setError('');
+        try {
+            const text = await file.text();
+            setImportPayload(text);
+            setImportFileName(file.name);
+        } catch (err) {
+            setError(String(err));
+        }
+    }
+
+    async function submitImport(event: FormEvent<HTMLFormElement>) {
+        event.preventDefault();
+        setError('');
+        if (!importPayload) {
+            setError('請先選擇要匯入的備份檔');
+            return;
+        }
+        try {
+            const result = await ImportVault(secCurrentPw, importPayload);
+            await refreshVault();
+            closeSecurity();
+            setNotice(`匯入完成：新增 ${result.added}、略過重複 ${result.skipped}`);
+        } catch (err) {
+            setError(String(err));
+        }
     }
 
     const categories = useMemo(() => {
@@ -714,8 +823,18 @@ function App() {
                                             <label className="wide">
                                                 <span>Secret</span>
                                                 <input value={form.secret}
-                                                       onChange={(event) => setForm({...form, secret: event.target.value})}
+                                                       className={secretCheck && !secretCheck.empty && !secretCheck.valid ? 'field-missing' : ''}
+                                                       onChange={(event) => onSecretChange(event.target.value)}
                                                        required/>
+                                                {secretCheck && !secretCheck.empty && (
+                                                    <small className={secretCheck.valid ? (secretCheck.duplicate ? 'secret-hint warn' : 'secret-hint ok') : 'secret-hint err'}>
+                                                        {!secretCheck.valid
+                                                            ? '密鑰格式不正確，需為 Base32。'
+                                                            : secretCheck.duplicate
+                                                                ? `已有相同密鑰的帳號：${secretCheck.duplicateLabel}`
+                                                                : '密鑰格式正確。'}
+                                                    </small>
+                                                )}
                                             </label>
                                             <label>
                                                 <span>演算法</span>
@@ -817,7 +936,99 @@ function App() {
                             </div>
                             <span className="pill">OS user scoped</span>
                         </div>
+                        <div className="setting-row">
+                            <div>
+                                <strong>主密碼</strong>
+                                <span>變更主密碼會以新密碼重新加密整個 vault。</span>
+                            </div>
+                            <button className="plain-action" onClick={() => openSecurity('change')}>變更</button>
+                        </div>
+                        <div className="setting-row">
+                            <div>
+                                <strong>備份與還原</strong>
+                                <span>匯出為加密備份檔，或從備份檔匯入帳號（重複帳號會自動略過）。</span>
+                            </div>
+                            <div className="setting-actions">
+                                <button className="plain-action" onClick={() => openSecurity('export')}>匯出</button>
+                                <button className="plain-action" onClick={() => openSecurity('import')}>匯入</button>
+                            </div>
+                        </div>
                     </section>
+                )}
+                {securityMode === 'change' && (
+                    <div className="modal-backdrop">
+                        <section className="confirm-modal">
+                            <h2>變更主密碼</h2>
+                            <form className="account-form" onSubmit={submitChangePassword}>
+                                <label>
+                                    <span>目前主密碼</span>
+                                    <input type="password" value={secCurrentPw} autoFocus
+                                           onChange={(event) => setSecCurrentPw(event.target.value)} required/>
+                                </label>
+                                <label>
+                                    <span>新主密碼（至少 8 個字元）</span>
+                                    <input type="password" value={secNewPw}
+                                           onChange={(event) => setSecNewPw(event.target.value)} required/>
+                                </label>
+                                <label>
+                                    <span>再次輸入新主密碼</span>
+                                    <input type="password" value={secConfirmPw}
+                                           onChange={(event) => setSecConfirmPw(event.target.value)} required/>
+                                </label>
+                                <div className="form-actions">
+                                    <button type="button" className="plain-action" onClick={closeSecurity}>取消</button>
+                                    <button type="submit" className="primary-action">變更</button>
+                                </div>
+                            </form>
+                        </section>
+                    </div>
+                )}
+                {securityMode === 'export' && (
+                    <div className="modal-backdrop">
+                        <section className="confirm-modal">
+                            <h2>匯出加密備份</h2>
+                            <p>請再次輸入主密碼以確認身分，匯出檔將以該密碼加密。</p>
+                            <form className="account-form" onSubmit={submitExport}>
+                                <label>
+                                    <span>主密碼</span>
+                                    <input type="password" value={secCurrentPw} autoFocus
+                                           onChange={(event) => setSecCurrentPw(event.target.value)} required/>
+                                </label>
+                                <div className="form-actions">
+                                    <button type="button" className="plain-action" onClick={closeSecurity}>取消</button>
+                                    <button type="submit" className="primary-action">匯出</button>
+                                </div>
+                            </form>
+                        </section>
+                    </div>
+                )}
+                {securityMode === 'import' && (
+                    <div className="modal-backdrop">
+                        <section className="confirm-modal">
+                            <h2>從備份匯入</h2>
+                            <p>選擇先前匯出的備份檔，並輸入該檔案的加密密碼。</p>
+                            <form className="account-form" onSubmit={submitImport}>
+                                <label>
+                                    <span>備份檔</span>
+                                    <input type="file" accept="application/json,.json"
+                                           onChange={(event) => {
+                                               const file = event.target.files?.[0];
+                                               if (file) loadImportFile(file);
+                                           }}/>
+                                    {importFileName && <small>{importFileName}</small>}
+                                </label>
+                                <label>
+                                    <span>備份檔密碼</span>
+                                    <input type="password" value={secCurrentPw}
+                                           onChange={(event) => setSecCurrentPw(event.target.value)} required/>
+                                </label>
+                                <div className="form-actions">
+                                    <button type="button" className="plain-action" onClick={closeSecurity}>取消</button>
+                                    <button type="submit" className="primary-action">匯入</button>
+                                </div>
+                            </form>
+                        </section>
+                    </div>
                 )}
                 {editingID && (
                     <div className="modal-backdrop">

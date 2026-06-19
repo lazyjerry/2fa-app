@@ -35,10 +35,20 @@ const dict: Record<Locale, Dict> = {
         requiredName: '名稱',
         category: '分類',
         importFromClipboard: '從剪貼簿貼上',
+        imageModePasteOnlyImage: '圖片模式只支援貼上圖片，文字請改用 URI 模式',
         saveSuccess: '已儲存',
         updateSuccess: '已更新',
         deleted: '已刪除',
         copied: '驗證碼已複製',
+        copiedTitle: '複製驗證碼',
+        hideCodeTitle: '隱藏驗證碼',
+        showCodeTitle: '顯示驗證碼',
+        pinTitle: '釘選',
+        unpinTitle: '取消釘選',
+        moveUpTitle: '上移',
+        moveDownTitle: '下移',
+        editTitle: '編輯',
+        deleteTitle: '刪除',
         settingsTitle: '設定',
         language: '語言',
         languageHint: '介面語言偏好，未翻譯文案會回退到繁體中文。',
@@ -71,6 +81,21 @@ const dict: Record<Locale, Dict> = {
         qrPlaceholder: '先上傳圖片或直接貼上 QRCode 圖片',
         uriPlaceholder: '貼上 otpauth://totp/...',
         nameRequiredError: '名稱為必填'
+        ,passwordMismatchError: '兩次密碼不一致'
+        ,touchIdUnavailableError: 'Touch ID 解鎖需正式簽章發布版本（含 keychain entitlements）才能使用，開發版暫不支援。'
+        ,uriRequiredError: '請先提供 otpauth URI 或先完成 QRCode 掃描'
+        ,uriFormatError: 'URI 格式錯誤，必須以 otpauth:// 開頭'
+        ,confirmAdd: '確認要新增這筆驗證碼嗎？'
+        ,confirmUpdate: '確認要更新這筆驗證碼分類與名稱嗎？'
+        ,confirmDelete: '確認要刪除 {issuer} / {name} 嗎？'
+        ,qrReadFromImage: '已從圖片讀取 QRCode'
+        ,qrReadFromClipboard: '已從剪貼簿圖片讀取 QRCode'
+        ,clipboardNoImageError: '剪貼簿中沒有可用的 QRCode 圖片'
+        ,passwordChanged: '主密碼已變更'
+        ,exportSaved: '已匯出加密備份檔：{path}'
+        ,exportCanceled: '已取消匯出'
+        ,touchIdEnabled: '已啟用 Touch ID 解鎖'
+        ,touchIdDisabled: '已停用 Touch ID 解鎖'
     },
     en: {
         appName: 'Secure 2FA',
@@ -102,10 +127,20 @@ const dict: Record<Locale, Dict> = {
         requiredName: 'Label',
         category: 'Category',
         importFromClipboard: 'Paste from Clipboard',
+        imageModePasteOnlyImage: 'Image mode accepts pasted images only. Switch to URI mode for text.',
         saveSuccess: 'Saved',
         updateSuccess: 'Updated',
         deleted: 'Deleted',
         copied: 'Code copied',
+        copiedTitle: 'Copy code',
+        hideCodeTitle: 'Hide code',
+        showCodeTitle: 'Show code',
+        pinTitle: 'Pin',
+        unpinTitle: 'Unpin',
+        moveUpTitle: 'Move up',
+        moveDownTitle: 'Move down',
+        editTitle: 'Edit',
+        deleteTitle: 'Delete',
         settingsTitle: 'Settings',
         language: 'Language',
         languageHint: 'UI language preference. Missing keys fall back to Traditional Chinese.',
@@ -137,7 +172,22 @@ const dict: Record<Locale, Dict> = {
         qrResult: 'QR Parse Result (otpauth URI)',
         qrPlaceholder: 'Upload an image or paste a QR image',
         uriPlaceholder: 'Paste otpauth://totp/...',
-        nameRequiredError: 'Name is required'
+        nameRequiredError: 'Name is required',
+        passwordMismatchError: 'Passwords do not match',
+        touchIdUnavailableError: 'Touch ID unlock is available only in a signed release build with keychain entitlements.',
+        uriRequiredError: 'Provide an otpauth URI or complete QR scanning first',
+        uriFormatError: 'Invalid URI format. It must start with otpauth://',
+        confirmAdd: 'Add this authenticator entry?',
+        confirmUpdate: 'Update this entry label and category?',
+        confirmDelete: 'Delete {issuer} / {name}?',
+        qrReadFromImage: 'QRCode read from image',
+        qrReadFromClipboard: 'QRCode read from clipboard image',
+        clipboardNoImageError: 'No usable QRCode image found in clipboard',
+        passwordChanged: 'Master password changed',
+        exportSaved: 'Encrypted backup exported: {path}',
+        exportCanceled: 'Export canceled',
+        touchIdEnabled: 'Touch ID unlock enabled',
+        touchIdDisabled: 'Touch ID unlock disabled'
     }
 };
 

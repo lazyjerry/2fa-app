@@ -366,6 +366,28 @@ button {
     border: 1px solid var(--hud-default);
 }
 
+.icon-action.pin-action {
+    border-color: #3f8cff;
+    color: #8ab7ff;
+}
+
+.icon-action.pin-action:hover {
+    border-color: #5da0ff;
+    background: #3f8cff;
+    color: #ffffff;
+}
+
+.icon-action.reorder-action {
+    border-color: #f0b34a;
+    color: #ffd287;
+}
+
+.icon-action.reorder-action:hover {
+    border-color: #f5c66f;
+    background: #c38a2f;
+    color: #ffffff;
+}
+
 .security-list {
     display: grid;
     gap: 7px;

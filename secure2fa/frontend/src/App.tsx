@@ -258,7 +258,7 @@ function App() {
         setNotice('');
         try {
             if (!setup?.hasVault) {
-                if (password !== confirmPassword) throw new Error('兩次密碼不一致');
+                if (password !== confirmPassword) throw new Error(t('passwordMismatchError'));
                 await CreateVault(password);
             } else {
                 await UnlockVault(password);
@@ -275,7 +275,7 @@ function App() {
 
     function notifyBiometricUnavailable() {
         setNotice('');
-        setError('Touch ID 解鎖需正式簽章發布版本（含 keychain entitlements）才能使用，開發版暫不支援。');
+        setError(t('touchIdUnavailableError'));
     }
 
     async function unlockWithTouchID() {
@@ -329,16 +329,16 @@ function App() {
             if (isUriMode) {
                 const uri = uriInput.trim();
                 if (!uri) {
-                    setError('請先提供 otpauth URI 或先完成 QRCode 掃描');
+                    setError(t('uriRequiredError'));
                     return;
                 }
                 if (!uri.startsWith('otpauth://')) {
-                    setError('URI 格式錯誤，必須以 otpauth:// 開頭');
+                    setError(t('uriFormatError'));
                     return;
                 }
             }
 
-            if (!(await requestConfirm('確認要新增這筆驗證碼嗎？'))) return;
+            if (!(await requestConfirm(t('confirmAdd')))) return;
             if (isUriMode) {
                 await AddAccountFromURI({uri: uriInput.trim(), category: form.category, notes});
                 setUriInput('');
@@ -368,7 +368,7 @@ function App() {
                 setError(t('nameRequiredError'));
                 return;
             }
-            if (!(await requestConfirm('確認要更新這筆驗證碼分類與名稱嗎？'))) return;
+            if (!(await requestConfirm(t('confirmUpdate')))) return;
             await UpdateAccount(editingID, {
                 issuer: '',
                 name: '',
@@ -397,7 +397,7 @@ function App() {
             const uri = await extractOtpauthFromImageFile(file);
             setUriInput(uri);
             setAddMode('image');
-            setNotice('已從圖片讀取 QRCode');
+            setNotice(t('qrReadFromImage'));
         } catch (err) {
             setError(String(err));
         }
@@ -416,11 +416,11 @@ function App() {
                     const uri = await extractOtpauthFromImageBlob(blob);
                     setUriInput(uri);
                     setAddMode('image');
-                    setNotice('已從剪貼簿圖片讀取 QRCode');
+                    setNotice(t('qrReadFromClipboard'));
                     return;
                 }
             }
-            throw new Error('剪貼簿中沒有可用的 QRCode 圖片');
+            throw new Error(t('clipboardNoImageError'));
         } catch (err) {
             setError(String(err));
         }
@@ -448,7 +448,7 @@ function App() {
 
     async function removeAccount(code: main.CodeView) {
         setError('');
-        if (!(await requestConfirm(`確認要刪除 ${code.issuer} / ${code.name} 嗎？`))) return;
+        if (!(await requestConfirm(t('confirmDelete', {issuer: code.issuer, name: code.name})))) return;
         await DeleteAccount(code.id);
         await refreshVault();
         setNotice(t('deleted'));
@@ -517,13 +517,13 @@ function App() {
         event.preventDefault();
         setError('');
         if (secNewPw !== secConfirmPw) {
-            setError('兩次輸入的新密碼不一致');
+            setError(t('passwordMismatchError'));
             return;
         }
         try {
             await ChangePassword(secCurrentPw, secNewPw);
             closeSecurity();
-            setNotice('主密碼已變更');
+            setNotice(t('passwordChanged'));
         } catch (err) {
             setError(String(err));
         }
@@ -536,9 +536,9 @@ function App() {
             const savedPath = await ExportVaultToFile(secCurrentPw);
             closeSecurity();
             if (savedPath) {
-                setNotice(`已匯出加密備份檔：${savedPath}`);
+                setNotice(t('exportSaved', {path: savedPath}));
             } else {
-                setNotice('已取消匯出');
+                setNotice(t('exportCanceled'));
             }
         } catch (err) {
             setError(String(err));
@@ -584,7 +584,7 @@ function App() {
             await EnableBiometricUnlock(secCurrentPw);
             closeSecurity();
             await refreshSetup();
-            setNotice('已啟用 Touch ID 解鎖');
+            setNotice(t('touchIdEnabled'));
         } catch (err) {
             setError(String(err));
         }
@@ -596,7 +596,7 @@ function App() {
         try {
             await DisableBiometricUnlock();
             await refreshSetup();
-            setNotice('已停用 Touch ID 解鎖');
+            setNotice(t('touchIdDisabled'));
         } catch (err) {
             setError(String(err));
         }
@@ -746,6 +746,7 @@ function App() {
                                                         <span>{code.category || t('uncategorized')}</span>
                                                     </div>
                                                 </div>
+                                                
                                             </div>
 
                                             <div className="row-otp-wrap">
@@ -761,35 +762,35 @@ function App() {
                                                 <div className="otp-actions">
                                                     <button className="icon-action"
                                                             onClick={() => copyCode(code.id)}
-                                                            title="複製驗證碼">
+                                                            title={t('copiedTitle')}>
                                                         <Copy size={18}/>
                                                     </button>
                                                     <button className="icon-action"
                                                             onClick={() => setRevealed({...revealed, [code.id]: !revealed[code.id]})}
-                                                            title={isVisible ? '隱藏驗證碼' : '顯示驗證碼'}>
+                                                            title={isVisible ? t('hideCodeTitle') : t('showCodeTitle')}>
                                                         {isVisible ? <EyeOff size={18}/> : <Eye size={18}/>}
                                                     </button>
                                                 </div>
 
-                                                <button className="icon-action"
+                                                <button className="icon-action pin-action"
                                                         onClick={() => togglePin(code)}
-                                                        title={code.pinned ? '取消釘選' : '釘選'}>
+                                                        title={code.pinned ? t('unpinTitle') : t('pinTitle')}>
                                                     {code.pinned ? <PinOff size={18}/> : <Pin size={18}/>}
                                                 </button>
                                                 {canReorder && (
                                                     <>
-                                                        <button className="icon-action" onClick={() => moveAccount(code.id, 'up')} title="上移">
+                                                        <button className="icon-action reorder-action" onClick={() => moveAccount(code.id, 'up')} title={t('moveUpTitle')}>
                                                             <ChevronUp size={18}/>
                                                         </button>
-                                                        <button className="icon-action" onClick={() => moveAccount(code.id, 'down')} title="下移">
+                                                        <button className="icon-action reorder-action" onClick={() => moveAccount(code.id, 'down')} title={t('moveDownTitle')}>
                                                             <ChevronDown size={18}/>
                                                         </button>
                                                     </>
                                                 )}
-                                                <button className="icon-action" onClick={() => beginEdit(code)} title="編輯">
+                                                <button className="icon-action" onClick={() => beginEdit(code)} title={t('editTitle')}>
                                                     <Pencil size={18}/>
                                                 </button>
-                                                <button className="icon-action danger-icon" onClick={() => removeAccount(code)} title="刪除">
+                                                <button className="icon-action danger-icon" onClick={() => removeAccount(code)} title={t('deleteTitle')}>
                                                     <Trash2 size={18}/>
                                                 </button>
                                             </div>
@@ -822,7 +823,7 @@ function App() {
                                         <input value={form.notes}
                                                className={!form.notes.trim() ? 'field-missing' : ''}
                                                required
-                                               placeholder="請先輸入名稱"
+                                                 placeholder={t('requiredName')}
                                                onChange={(event) => setForm({...form, notes: event.target.value})}/>
                                     </label>
                                     <label>
@@ -851,7 +852,7 @@ function App() {
                                                             .find((item) => item.type.startsWith('image/'));
                                                         event.preventDefault();
                                                         if (!imageItem) {
-                                                            setError('圖片模式只支援貼上圖片，文字請改用 URI 模式');
+                                                            setError(t('imageModePasteOnlyImage'));
                                                             return;
                                                         }
                                                         const file = imageItem.getAsFile();

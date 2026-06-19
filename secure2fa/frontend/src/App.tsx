@@ -60,20 +60,25 @@ type SelectOption = {
 const selectStyles: StylesConfig<SelectOption, false> = {
     control: (base, state) => ({
         ...base,
-        minHeight: 40,
-        backgroundColor: 'rgba(9, 17, 27, 0.82)',
-        borderColor: state.isFocused ? '#249d79' : 'rgba(255, 255, 255, 0.18)',
-        boxShadow: state.isFocused ? '0 0 0 1px rgba(36, 157, 121, 0.55), inset 0 0 24px rgba(36, 157, 121, 0.08)' : 'inset 0 0 18px rgba(255, 255, 255, 0.03)',
-        borderRadius: 0,
+        minHeight: 36,
+        backgroundColor: 'transparent',
+        borderColor: state.isFocused ? 'rgba(255, 255, 255, 0.5)' : 'rgba(255, 255, 255, 0.25)',
+        boxShadow: state.isFocused ? '0 0 0 0.25rem rgba(255, 255, 255, 0.25)' : 'none',
+        borderRadius: 4,
+        fontSize: '0.875rem',
         '&:hover': {
-            borderColor: state.isFocused ? '#249d79' : 'rgba(255, 255, 255, 0.32)'
+            borderColor: state.isFocused ? 'rgba(255, 255, 255, 0.5)' : 'rgba(255, 255, 255, 0.25)'
         }
+    }),
+    valueContainer: (base) => ({
+        ...base,
+        padding: '0.125rem 0.75rem'
     }),
     menu: (base) => ({
         ...base,
-        backgroundColor: '#111b26',
+        backgroundColor: '#1d2835',
         border: '1px solid rgba(255, 255, 255, 0.25)',
-        borderRadius: 0,
+        borderRadius: 4,
         overflow: 'hidden',
         zIndex: 60
     }),
@@ -97,7 +102,7 @@ const selectStyles: StylesConfig<SelectOption, false> = {
     }),
     indicatorSeparator: (base) => ({
         ...base,
-        backgroundColor: 'rgba(255, 255, 255, 0.18)'
+        backgroundColor: 'rgba(255, 255, 255, 0.25)'
     }),
     dropdownIndicator: (base) => ({
         ...base,
@@ -139,7 +144,6 @@ function App() {
     const [privacyBlur, setPrivacyBlur] = useState(false);
     const [confirmOpen, setConfirmOpen] = useState(false);
     const [confirmMessage, setConfirmMessage] = useState('');
-    const fileInputRef = useRef<HTMLInputElement | null>(null);
     const idleTimer = useRef<number | null>(null);
     const confirmResolver = useRef<((value: boolean) => void) | null>(null);
 
@@ -526,15 +530,15 @@ function App() {
                                             <div className="row-identity">
                                                 <div className="row-title">
                                                     <strong>{code.issuer}</strong>
-                                                    <span>{code.name}</span>
+                                                    <span>{code.notes || '未填寫'}</span>
                                                 </div>
                                                 <div className="row-meta">
                                                     <span>{code.category || '未分類'}</span>
                                                     <span>{code.algorithm} / {code.digits}</span>
                                                 </div>
                                                 <div className="row-note">
-                                                    <span className="row-note-label">名稱</span>
-                                                    <span className="row-note-value">{code.notes || '未填寫'}</span>
+                                                    <span className="row-note-label">帳號</span>
+                                                    <span className="row-note-value">{code.name || '未填寫'}</span>
                                                 </div>
                                             </div>
 
@@ -643,26 +647,18 @@ function App() {
                                                     placeholder="先上傳圖片或直接貼上 QRCode 圖片"
                                                 />
                                             </label>
+                                            <input
+                                                className="file-browser-input wide"
+                                                type="file"
+                                                accept="image/*"
+                                                onChange={async (event) => {
+                                                    const file = event.target.files?.[0];
+                                                    if (!file) return;
+                                                    await importFromFile(file);
+                                                    event.target.value = '';
+                                                }}
+                                            />
                                             <div className="form-actions wide">
-                                                <input
-                                                    ref={fileInputRef}
-                                                    type="file"
-                                                    accept="image/*"
-                                                    hidden
-                                                    onChange={async (event) => {
-                                                        const file = event.target.files?.[0];
-                                                        if (!file) return;
-                                                        await importFromFile(file);
-                                                        event.target.value = '';
-                                                    }}
-                                                />
-                                                <button
-                                                    type="button"
-                                                    className="plain-action"
-                                                    onClick={() => fileInputRef.current?.click()}
-                                                >
-                                                    上傳 QRCode 圖片
-                                                </button>
                                                 <button
                                                     type="button"
                                                     className="plain-action"

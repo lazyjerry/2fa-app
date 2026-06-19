@@ -21,6 +21,7 @@ if [[ "$(uname -s)" != "Darwin" ]]; then
   exit 1
 fi
 
+rm -rf "$OUTPUT_DIR"
 mkdir -p "$OUTPUT_DIR"
 
 cd "$APP_DIR"
@@ -32,13 +33,9 @@ if [[ ! -d "$BUILT_APP" ]]; then
   exit 1
 fi
 
-STAMP="$(date +%Y%m%d-%H%M%S)"
-TARGET_APP="$OUTPUT_DIR/${APP_DISPLAY_NAME}-${STAMP}.app"
-LATEST_APP="$OUTPUT_DIR/${APP_DISPLAY_NAME}.app"
+TARGET_APP="$OUTPUT_DIR/${APP_DISPLAY_NAME}.app"
 
-rm -rf "$TARGET_APP" "$LATEST_APP"
+rm -rf "$TARGET_APP"
 ditto "$BUILT_APP" "$TARGET_APP"
-ditto "$TARGET_APP" "$LATEST_APP"
 
 echo "App bundle created: $TARGET_APP"
-echo "Latest copy: $LATEST_APP"

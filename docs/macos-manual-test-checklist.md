@@ -7,7 +7,7 @@
 | 架構 | macOS 版本 | Package | 結果 |
 | --- | --- | --- | --- |
 | Intel | 待填 | unsigned `.app` / signed `.app` | 待測 |
-| Apple Silicon | 待填 | unsigned `.app` / signed `.app` | 待測 |
+| Apple Silicon | 待填 | unsigned `.app` / signed `.app` | ok |
 
 ## 基本功能
 

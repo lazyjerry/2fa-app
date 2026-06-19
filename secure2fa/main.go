@@ -27,7 +27,7 @@ func main() {
 	// Create application with options
 	err = wails.Run(&options.App{
 		Title:     "Secure 2FA",
-		Width:     1050,
+		Width:     1250,
 		Height:    760,
 		MinWidth:  1050,
 		MinHeight: 640,

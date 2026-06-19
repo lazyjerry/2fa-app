@@ -19,7 +19,6 @@ const api = vi.hoisted(() => ({
     GetCodes: vi.fn(),
     GetSetupState: vi.fn(),
     GetSettings: vi.fn(),
-    ImportAccountsFromFile: vi.fn(),
     ImportVaultFromFile: vi.fn(),
     LockVault: vi.fn(),
     SaveSettings: vi.fn(),
@@ -113,7 +112,6 @@ function resetBackend(unlocked = true) {
     api.UpdateAccount.mockResolvedValue(undefined);
     api.ChangePassword.mockResolvedValue(undefined);
     api.ExportVaultToFile.mockResolvedValue('');
-    api.ImportAccountsFromFile.mockResolvedValue({total: 0, added: 0, skipped: 0});
     api.ImportVaultFromFile.mockResolvedValue({total: 0, added: 0, skipped: 0});
     api.EnableBiometricUnlock.mockResolvedValue(undefined);
     api.DisableBiometricUnlock.mockResolvedValue(undefined);
@@ -143,6 +141,7 @@ async function renderUnlockedApp() {
 
 beforeEach(() => {
     vi.clearAllMocks();
+    window.localStorage.setItem('secure2fa.locale', 'zh-TW');
     resetBackend();
 });
 
@@ -170,7 +169,7 @@ describe('App flows', () => {
 
         await user.click(screen.getByRole('button', {name: '新增'}));
         await user.click(screen.getByRole('button', {name: 'URI'}));
-        await user.type(screen.getByPlaceholderText('請先輸入名稱'), 'GitHub login');
+        await user.type(screen.getByPlaceholderText('名稱'), 'GitHub login');
         await user.type(
             screen.getByPlaceholderText('貼上 otpauth://totp/...'),
             'otpauth://totp/GitHub:user@example.com?secret=JBSWY3DPEHPK3PXP&issuer=GitHub'
@@ -218,18 +217,6 @@ describe('App flows', () => {
             ...defaultSettings,
             autoLockSeconds: 60
         }));
-    });
-
-    it('runs batch import from settings', async () => {
-        const user = userEvent.setup();
-        api.ImportAccountsFromFile.mockResolvedValue({total: 2, added: 2, skipped: 0});
-        await renderUnlockedApp();
-
-        await user.click(screen.getByRole('button', {name: '設定'}));
-        await user.click(screen.getByRole('button', {name: '批次匯入'}));
-
-        await waitFor(() => expect(api.ImportAccountsFromFile).toHaveBeenCalledTimes(1));
-        expect(await screen.findByText('批次匯入完成：新增 2、略過重複 0')).toBeInTheDocument();
     });
 
     it('switches UI language to English', async () => {

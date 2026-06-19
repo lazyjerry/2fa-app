@@ -70,10 +70,6 @@ export function ImportAccounts(arg1) {
   return window['go']['main']['App']['ImportAccounts'](arg1);
 }
 
-export function ImportAccountsFromFile() {
-  return window['go']['main']['App']['ImportAccountsFromFile']();
-}
-
 export function ImportVault(arg1) {
   return window['go']['main']['App']['ImportVault'](arg1);
 }

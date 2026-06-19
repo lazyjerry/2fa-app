@@ -36,8 +36,6 @@ export function GetSetupState():Promise<main.SetupState>;
 
 export function ImportAccounts(arg1:string):Promise<main.ImportResult>;
 
-export function ImportAccountsFromFile():Promise<main.ImportResult>;
-
 export function ImportVault(arg1:string):Promise<main.ImportResult>;
 
 export function ImportVaultFromFile():Promise<main.ImportResult>;

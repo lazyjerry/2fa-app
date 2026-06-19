@@ -151,34 +151,6 @@ func (a *App) ImportVault(payload string) (ImportResult, error) {
 	return result, nil
 }
 
-// ImportAccountsFromFile 匯入第三方 authenticator 匯出檔，支援多行 otpauth URI 與常見 JSON 格式。
-// 使用者取消時回傳 Total 為 0 的空結果且不視為錯誤。
-func (a *App) ImportAccountsFromFile() (ImportResult, error) {
-	if a.ctx == nil {
-		return ImportResult{}, errors.New("runtime context is not ready")
-	}
-	path, err := wailsruntime.OpenFileDialog(a.ctx, wailsruntime.OpenDialogOptions{
-		Title: "批次匯入驗證碼",
-		Filters: []wailsruntime.FileFilter{
-			{DisplayName: "支援格式 (*.json, *.txt, *.csv)", Pattern: "*.json;*.txt;*.csv"},
-			{DisplayName: "JSON 檔 (*.json)", Pattern: "*.json"},
-			{DisplayName: "文字檔 (*.txt)", Pattern: "*.txt"},
-			{DisplayName: "CSV 檔 (*.csv)", Pattern: "*.csv"},
-		},
-	})
-	if err != nil {
-		return ImportResult{}, err
-	}
-	if path == "" {
-		return ImportResult{}, nil
-	}
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return ImportResult{}, err
-	}
-	return a.ImportAccounts(string(data))
-}
-
 func (a *App) ImportAccounts(payload string) (ImportResult, error) {
 	a.mu.Lock()
 	defer a.mu.Unlock()

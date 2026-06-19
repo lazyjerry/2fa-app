@@ -40,7 +40,6 @@ import {
     GetCodes,
     GetSetupState,
     GetSettings,
-    ImportAccountsFromFile,
     ImportVaultFromFile,
     LockVault,
     MoveAccount,
@@ -561,22 +560,6 @@ function App() {
         }
     }
 
-    async function runBatchImport() {
-        setError('');
-        setNotice('');
-        try {
-            const result = await ImportAccountsFromFile();
-            if (result.total === 0) {
-                setNotice(t('batchImportCanceled'));
-                return;
-            }
-            await refreshVault();
-            setNotice(t('batchImportDone', {added: result.added, skipped: result.skipped}));
-        } catch (err) {
-            setError(String(err));
-        }
-    }
-
     async function submitEnableBiometric(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
         setError('');
@@ -1057,13 +1040,6 @@ function App() {
                                 <button className="plain-action" onClick={() => openSecurity('export')}>{t('export')}</button>
                                 <button className="plain-action" onClick={runImport}>{t('import')}</button>
                             </div>
-                        </div>
-                        <div className="setting-row">
-                            <div>
-                                <strong>{t('batchImportTitle')}</strong>
-                                <span>{t('batchImportHint')}</span>
-                            </div>
-                            <button className="plain-action" onClick={runBatchImport}>{t('batchImport')}</button>
                         </div>
                     </section>
                 )}

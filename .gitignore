@@ -1,0 +1,9 @@
+# macOS
+.DS_Store
+
+docs/research-skill/
+secure2fa/build/bin/
+secure2fa/node_modules/
+secure2fa/frontend/node_modules/
+secure2fa/frontend/dist/
+secure2fa/frontend/package.json.md5

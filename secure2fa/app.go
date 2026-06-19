@@ -253,6 +253,68 @@ func (a *App) DeleteAccount(id string) error {
 	return errors.New("account not found")
 }
 
+func (a *App) SetAccountPinned(id string, pinned bool) (AccountView, error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if err := a.requireUnlockedLocked(); err != nil {
+		return AccountView{}, err
+	}
+	for i := range a.vault.Accounts {
+		if a.vault.Accounts[i].ID == id {
+			a.vault.Accounts[i].Pinned = pinned
+			if err := a.saveLocked(); err != nil {
+				return AccountView{}, err
+			}
+			return viewForAccount(a.vault.Accounts[i]), nil
+		}
+	}
+	return AccountView{}, errors.New("account not found")
+}
+
+// MoveAccount 在同一釘選群組（pinned 或非 pinned）內，與該方向最近的同群組帳號交換位置，
+// 以維持清單「釘選優先」的顯示分組。已在群組邊界時不動作。
+func (a *App) MoveAccount(id, direction string) error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if err := a.requireUnlockedLocked(); err != nil {
+		return err
+	}
+
+	var step int
+	switch direction {
+	case "up":
+		step = -1
+	case "down":
+		step = 1
+	default:
+		return errors.New("invalid direction")
+	}
+
+	idx := -1
+	for i := range a.vault.Accounts {
+		if a.vault.Accounts[i].ID == id {
+			idx = i
+			break
+		}
+	}
+	if idx == -1 {
+		return errors.New("account not found")
+	}
+
+	target := -1
+	for j := idx + step; j >= 0 && j < len(a.vault.Accounts); j += step {
+		if a.vault.Accounts[j].Pinned == a.vault.Accounts[idx].Pinned {
+			target = j
+			break
+		}
+	}
+	if target == -1 {
+		return nil
+	}
+	a.vault.Accounts[idx], a.vault.Accounts[target] = a.vault.Accounts[target], a.vault.Accounts[idx]
+	return a.saveLocked()
+}
+
 func (a *App) GetSettings() (Settings, error) {
 	a.mu.Lock()
 	defer a.mu.Unlock()

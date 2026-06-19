@@ -2,12 +2,16 @@ import {FormEvent, useCallback, useEffect, useMemo, useRef, useState} from 'reac
 import jsQR from 'jsqr';
 import {
     Check,
+    ChevronDown,
+    ChevronUp,
     Copy,
     Eye,
     EyeOff,
     Lock,
     LogOut,
     Pencil,
+    Pin,
+    PinOff,
     Plus,
     QrCode,
     Search,
@@ -21,6 +25,7 @@ import CreatableSelect from 'react-select/creatable';
 import {StylesConfig} from 'react-select';
 import './App.css';
 import frontendPackage from '../package.json';
+import {Locale, loadLocale, saveLocale, tr} from './i18n';
 import {
     AddAccount,
     AddAccountFromURI,
@@ -35,9 +40,12 @@ import {
     GetCodes,
     GetSetupState,
     GetSettings,
+    ImportAccountsFromFile,
     ImportVaultFromFile,
     LockVault,
+    MoveAccount,
     SaveSettings,
+    SetAccountPinned,
     UnlockVault,
     UnlockWithBiometrics,
     UpdateAccount,
@@ -133,6 +141,7 @@ const selectStyles: StylesConfig<SelectOption, false> = {
 };
 
 function App() {
+    const [locale, setLocale] = useState<Locale>(() => loadLocale());
     const [setup, setSetup] = useState<main.SetupState | null>(null);
     const [unlocked, setUnlocked] = useState(false);
     const [password, setPassword] = useState('');
@@ -163,6 +172,7 @@ function App() {
     const idleTimer = useRef<number | null>(null);
     const clipboardTimer = useRef<number | null>(null);
     const confirmResolver = useRef<((value: boolean) => void) | null>(null);
+    const t = useCallback((key: string, params?: Record<string, string | number>) => tr(locale, key, params), [locale]);
 
     function requestConfirm(message: string) {
         setConfirmMessage(message);
@@ -194,6 +204,10 @@ function App() {
     useEffect(() => {
         refreshSetup().catch((err) => setError(String(err)));
     }, [refreshSetup]);
+
+    useEffect(() => {
+        saveLocale(locale);
+    }, [locale]);
 
     useEffect(() => {
         if (!unlocked) return;
@@ -307,7 +321,7 @@ function App() {
         try {
             const notes = form.notes.trim();
             if (!notes) {
-                setError('名稱為必填');
+                setError(t('nameRequiredError'));
                 return;
             }
 
@@ -337,7 +351,7 @@ function App() {
             setTab('codes');
             setCategory('all');
             setQuery(notes);
-            setNotice('已儲存');
+            setNotice(t('saveSuccess'));
         } catch (err) {
             setError(String(err));
         }
@@ -351,7 +365,7 @@ function App() {
         try {
             const notes = editNote.trim();
             if (!notes) {
-                setError('名稱為必填');
+                setError(t('nameRequiredError'));
                 return;
             }
             if (!(await requestConfirm('確認要更新這筆驗證碼分類與名稱嗎？'))) return;
@@ -370,7 +384,7 @@ function App() {
             setEditNote('');
             setEditCategory('');
             await refreshVault();
-            setNotice('已更新');
+            setNotice(t('updateSuccess'));
         } catch (err) {
             setError(String(err));
         }
@@ -417,7 +431,7 @@ function App() {
         setNotice('');
         try {
             await CopyCode(id);
-            setNotice('驗證碼已複製');
+            setNotice(t('copied'));
             if (settings?.clipboardClearSeconds) {
                 // 只保留最新一次複製的計時器，避免多次複製堆疊出多個提前清空。
                 // 後端 ClearClipboard 仍會再次確認剪貼簿內容才清空。
@@ -437,7 +451,27 @@ function App() {
         if (!(await requestConfirm(`確認要刪除 ${code.issuer} / ${code.name} 嗎？`))) return;
         await DeleteAccount(code.id);
         await refreshVault();
-        setNotice('已刪除');
+        setNotice(t('deleted'));
+    }
+
+    async function togglePin(code: main.CodeView) {
+        setError('');
+        try {
+            await SetAccountPinned(code.id, !code.pinned);
+            await refreshVault();
+        } catch (err) {
+            setError(String(err));
+        }
+    }
+
+    async function moveAccount(id: string, direction: 'up' | 'down') {
+        setError('');
+        try {
+            await MoveAccount(id, direction);
+            await refreshVault();
+        } catch (err) {
+            setError(String(err));
+        }
     }
 
     function beginEdit(code: main.CodeView) {
@@ -460,7 +494,7 @@ function App() {
             : false;
         const saved = await SaveSettings(next);
         setSettings(saved);
-        setNotice(restartRequired ? '設定已更新，請重新啟動 APP 套用截圖防護變更。' : '設定已更新');
+        setNotice(restartRequired ? t('settingsUpdatedRestart') : t('settingsUpdated'));
     }
 
     function openSecurity(mode: Exclude<SecurityMode, null>) {
@@ -517,11 +551,27 @@ function App() {
         try {
             const result = await ImportVaultFromFile();
             if (result.total === 0) {
-                setNotice('已取消匯入');
+                setNotice(t('importCanceled'));
                 return;
             }
             await refreshVault();
-            setNotice(`匯入完成：新增 ${result.added}、略過重複 ${result.skipped}`);
+            setNotice(t('importDone', {added: result.added, skipped: result.skipped}));
+        } catch (err) {
+            setError(String(err));
+        }
+    }
+
+    async function runBatchImport() {
+        setError('');
+        setNotice('');
+        try {
+            const result = await ImportAccountsFromFile();
+            if (result.total === 0) {
+                setNotice(t('batchImportCanceled'));
+                return;
+            }
+            await refreshVault();
+            setNotice(t('batchImportDone', {added: result.added, skipped: result.skipped}));
         } catch (err) {
             setError(String(err));
         }
@@ -562,12 +612,12 @@ function App() {
     }, [categories]);
 
     const listCategoryOptions = useMemo<SelectOption[]>(() => {
-        return [{label: '全部分類', value: 'all'}, ...categoryOptions];
-    }, [categoryOptions]);
+        return [{label: t('allCategories'), value: 'all'}, ...categoryOptions];
+    }, [categoryOptions, t]);
 
     const filteredCodes = useMemo(() => {
         const text = query.trim().toLowerCase();
-        return codes.filter((code) => {
+        const matched = codes.filter((code) => {
             const matchCategory = category === 'all' || code.category === category;
             const matchText = !text || [code.issuer, code.name, code.category, code.notes]
                 .join(' ')
@@ -575,7 +625,12 @@ function App() {
                 .includes(text);
             return matchCategory && matchText;
         });
+        // 釘選優先；sort 穩定，各群組維持後端陣列順序。
+        return matched.sort((a, b) => Number(b.pinned) - Number(a.pinned));
     }, [category, codes, query]);
+
+    // 過濾或搜尋狀態下相鄰交換語意不清，僅在完整清單時開放排序。
+    const canReorder = category === 'all' && !query.trim();
 
     const screenshotSupported = setup?.platform === 'darwin' || setup?.platform === 'windows';
 
@@ -587,18 +642,18 @@ function App() {
                         <Shield size={30}/>
                         <div>
                             <h1>Secure 2FA</h1>
-                            <p>離線驗證碼保險庫</p>
+                            <p>{t('appSubtitle')}</p>
                         </div>
                     </div>
                     <form onSubmit={submitAuth} className="auth-form">
                         <label>
-                            <span>主密碼</span>
+                            <span>{t('password')}</span>
                             <input type="password" value={password} onChange={(event) => setPassword(event.target.value)}
                                    autoComplete="current-password" minLength={8} required autoFocus/>
                         </label>
                         {!setup?.hasVault && (
                             <label>
-                                <span>確認主密碼</span>
+                                <span>{t('confirmPassword')}</span>
                                 <input type="password" value={confirmPassword}
                                        onChange={(event) => setConfirmPassword(event.target.value)}
                                        autoComplete="new-password" minLength={8} required/>
@@ -606,19 +661,19 @@ function App() {
                         )}
                         <button className="primary-action" type="submit">
                             <Lock size={17}/>
-                            {setup?.hasVault ? '解鎖' : '建立保險庫'}
+                            {setup?.hasVault ? t('unlock') : t('createVault')}
                         </button>
                         {setup?.hasVault && biometricReleaseReady && setup.biometricAvailable && setup.biometricEnrolled && (
                             <button type="button"
                                     className="plain-action biometric-unlock"
                                     onClick={unlockWithTouchID}>
-                                使用 Touch ID 解鎖
+                                {t('touchIdUnlock')}
                             </button>
                         )}
                     </form>
                     <div className="security-list">
-                        <span>OS 使用者隔離：{setup?.osUserScoped ? '啟用' : '未啟用'}</span>
-                        <span>截圖防護：{setup?.screenshotProtection ? '平台支援' : '平台不支援'}</span>
+                        <span>{t('osUserIsolation')}：{setup?.osUserScoped ? t('enabled') : t('disabled')}</span>
+                        <span>{t('screenshotProtection')}：{setup?.screenshotProtection ? t('platformSupported') : t('platformUnsupported')}</span>
                     </div>
                     {error && <p className="error-line">{cleanError(error)}</p>}
                 </section>
@@ -638,17 +693,17 @@ function App() {
                 </div>
                 <nav className="nav-stack">
                     <button className={tab === 'codes' ? 'active' : ''} onClick={() => setTab('codes')}>
-                        <QrCode size={18}/> 驗證碼
+                        <QrCode size={18}/> {t('tabCodes')}
                     </button>
                     <button className={tab === 'add' ? 'active' : ''} onClick={() => setTab('add')}>
-                        <Plus size={18}/> 新增
+                        <Plus size={18}/> {t('tabAdd')}
                     </button>
                     <button className={tab === 'settings' ? 'active' : ''} onClick={() => setTab('settings')}>
-                        <SettingsIcon size={18}/> 設定
+                        <SettingsIcon size={18}/> {t('tabSettings')}
                     </button>
                 </nav>
                 <button className="plain-action lock-action" onClick={handleLock}>
-                    <LogOut size={17}/> 鎖定
+                    <LogOut size={17}/> {t('lock')}
                 </button>
             </aside>
 
@@ -659,7 +714,7 @@ function App() {
                             <div className="search-box">
                                 <Search size={18}/>
                                 <input value={query} onChange={(event) => setQuery(event.target.value)}
-                                       placeholder="搜尋 issuer、帳號、分類、名稱"/>
+                                       placeholder={t('searchPlaceholder')}/>
                             </div>
                             <Select
                                 options={listCategoryOptions}
@@ -677,19 +732,19 @@ function App() {
                                 {filteredCodes.map((code) => {
                                     const isVisible = revealed[code.id] || !settings?.maskCodes;
                                     return (
-                                        <article className="code-row" key={code.id}>
+                                        <article className={code.pinned ? 'code-row pinned' : 'code-row'} key={code.id}>
                                             <div className="row-identity">
                                                 <div className="row-title">
-                                                    <strong>{code.issuer}</strong>
-                                                    <span>{code.notes || '未填寫'}</span>
-                                                </div>
-                                                <div className="row-meta">
-                                                    <span>{code.category || '未分類'}</span>
-                                                    <span>{code.algorithm} / {code.digits}</span>
+                                                    {code.pinned && <Pin size={14} className="pin-mark"/>}
+                                                    <strong>{code.notes || t('notFilled')}</strong>
+                                                    <span>{code.issuer}</span>
                                                 </div>
                                                 <div className="row-note">
-                                                    <span className="row-note-label">帳號</span>
-                                                    <span className="row-note-value">{code.name || '未填寫'}</span>
+                                                    <span className="row-note-label">{t('accountName')}</span>
+                                                    <span className="row-note-value">{code.name || t('notFilled')}</span>
+                                                    <div className="row-meta">
+                                                        <span>{code.category || t('uncategorized')}</span>
+                                                    </div>
                                                 </div>
                                             </div>
 
@@ -716,6 +771,21 @@ function App() {
                                                     </button>
                                                 </div>
 
+                                                <button className="icon-action"
+                                                        onClick={() => togglePin(code)}
+                                                        title={code.pinned ? '取消釘選' : '釘選'}>
+                                                    {code.pinned ? <PinOff size={18}/> : <Pin size={18}/>}
+                                                </button>
+                                                {canReorder && (
+                                                    <>
+                                                        <button className="icon-action" onClick={() => moveAccount(code.id, 'up')} title="上移">
+                                                            <ChevronUp size={18}/>
+                                                        </button>
+                                                        <button className="icon-action" onClick={() => moveAccount(code.id, 'down')} title="下移">
+                                                            <ChevronDown size={18}/>
+                                                        </button>
+                                                    </>
+                                                )}
                                                 <button className="icon-action" onClick={() => beginEdit(code)} title="編輯">
                                                     <Pencil size={18}/>
                                                 </button>
@@ -726,7 +796,7 @@ function App() {
                                         </article>
                                     );
                                 })}
-                                {filteredCodes.length === 0 && <div className="empty-state">沒有符合條件的驗證碼</div>}
+                                {filteredCodes.length === 0 && <div className="empty-state">{t('emptyCodes')}</div>}
                             </section>
                         </section>
                     </>
@@ -737,18 +807,18 @@ function App() {
                             <form className="account-form add-form" onSubmit={submitAccount}>
                                 <div className="segmented">
                                     <button type="button" className={addMode === 'image' ? 'active' : ''}
-                                            onClick={() => setAddMode('image')}>圖片
+                                        onClick={() => setAddMode('image')}>{t('modeImage')}
                                     </button>
                                     <button type="button" className={addMode === 'uri' ? 'active' : ''}
-                                            onClick={() => setAddMode('uri')}>URI
+                                        onClick={() => setAddMode('uri')}>{t('modeUri')}
                                     </button>
                                     <button type="button" className={addMode === 'manual' ? 'active' : ''}
-                                            onClick={() => setAddMode('manual')}>手動
+                                        onClick={() => setAddMode('manual')}>{t('modeManual')}
                                     </button>
                                 </div>
                                 <div className="form-grid">
                                     <label className="wide">
-                                        <span>名稱 <span className="required-mark">*</span></span>
+                                    <span>{t('requiredName')} <span className="required-mark">*</span></span>
                                         <input value={form.notes}
                                                className={!form.notes.trim() ? 'field-missing' : ''}
                                                required
@@ -756,7 +826,7 @@ function App() {
                                                onChange={(event) => setForm({...form, notes: event.target.value})}/>
                                     </label>
                                     <label>
-                                        <span>分類</span>
+                                        <span>{t('category')}</span>
                                         <CreatableSelect
                                             options={categoryOptions}
                                             value={form.category ? {label: form.category, value: form.category} : null}
@@ -772,7 +842,7 @@ function App() {
                                     {addMode === 'image' ? (
                                         <>
                                             <label className="wide">
-                                                <span>QRCode 解析結果（otpauth URI）</span>
+                                                <span>{t('qrResult')}</span>
                                                 <textarea
                                                     value={uriInput}
                                                     readOnly
@@ -788,7 +858,7 @@ function App() {
                                                         if (!file) return;
                                                         await importFromFile(file);
                                                     }}
-                                                    placeholder="先上傳圖片或直接貼上 QRCode 圖片"
+                                                    placeholder={t('qrPlaceholder')}
                                                 />
                                             </label>
                                             <input
@@ -808,29 +878,29 @@ function App() {
                                                     className="plain-action"
                                                     onClick={importImageFromClipboard}
                                                 >
-                                                    從剪貼簿貼上
+                                                    {t('importFromClipboard')}
                                                 </button>
                                             </div>
                                         </>
                                     ) : addMode === 'uri' ? (
                                         <label className="wide">
-                                            <span>otpauth URI</span>
+                                            <span>{t('otpUri')}</span>
                                             <textarea
                                                 value={uriInput}
                                                 onChange={(event) => setUriInput(event.target.value)}
-                                                placeholder="貼上 otpauth://totp/..."
+                                                placeholder={t('uriPlaceholder')}
                                             />
                                         </label>
                                     ) : (
                                         <>
                                             <label>
-                                                <span>服務名稱</span>
+                                                <span>{t('serviceName')}</span>
                                                 <input value={form.issuer}
                                                        onChange={(event) => setForm({...form, issuer: event.target.value})}
                                                        required/>
                                             </label>
                                             <label>
-                                                <span>帳號名稱</span>
+                                                <span>{t('accountLabel')}</span>
                                                 <input value={form.name}
                                                        onChange={(event) => setForm({...form, name: event.target.value})}
                                                        required/>
@@ -888,7 +958,7 @@ function App() {
                                 <div className="form-actions">
                                     <button className="primary-action" type="submit">
                                         <Plus size={17}/>
-                                        新增
+                                        {t('addButton')}
                                     </button>
                                 </div>
                             </form>
@@ -897,7 +967,17 @@ function App() {
 
                 {tab === 'settings' && settings && (
                     <section className="settings-view">
-                        <h1>設定</h1>
+                        <h1>{t('settingsTitle')}</h1>
+                        <div className="setting-row">
+                            <div>
+                                <strong>{t('language')}</strong>
+                                <span>{t('languageHint')}</span>
+                            </div>
+                            <select value={locale} onChange={(event) => setLocale(event.target.value as Locale)}>
+                                <option value="zh-TW">{t('langZhTW')}</option>
+                                <option value="en">{t('langEn')}</option>
+                            </select>
+                        </div>
                         <div className="setting-row">
                             <div>
                                 <strong>預設遮蔽驗證碼</strong>
@@ -969,13 +1049,20 @@ function App() {
                         </div>
                         <div className="setting-row">
                             <div>
-                                <strong>備份與還原</strong>
-                                <span>匯出為明文 JSON 備份檔，或從備份檔匯入帳號（重複帳號會自動略過）。</span>
+                                <strong>{t('backupAndRestore')}</strong>
+                                <span>{t('backupAndRestoreHint')}</span>
                             </div>
                             <div className="setting-actions">
-                                <button className="plain-action" onClick={() => openSecurity('export')}>匯出</button>
-                                <button className="plain-action" onClick={runImport}>匯入</button>
+                                <button className="plain-action" onClick={() => openSecurity('export')}>{t('export')}</button>
+                                <button className="plain-action" onClick={runImport}>{t('import')}</button>
                             </div>
+                        </div>
+                        <div className="setting-row">
+                            <div>
+                                <strong>{t('batchImportTitle')}</strong>
+                                <span>{t('batchImportHint')}</span>
+                            </div>
+                            <button className="plain-action" onClick={runBatchImport}>{t('batchImport')}</button>
                         </div>
                     </section>
                 )}
@@ -1085,10 +1172,10 @@ function App() {
                                 </div>
                                 <div className="form-actions">
                                     <button type="button" className="plain-action" onClick={closeEditModal}>
-                                        <X size={16}/> 取消
+                                        <X size={16}/> {t('cancel')}
                                     </button>
                                     <button className="primary-action" type="submit">
-                                        <Check size={17}/> 更新
+                                        <Check size={17}/> {t('update')}
                                     </button>
                                 </div>
                             </form>
@@ -1098,14 +1185,14 @@ function App() {
                 {confirmOpen && (
                     <div className="modal-backdrop">
                         <section className="confirm-modal">
-                            <h2>確認操作</h2>
+                            <h2>{t('confirmAction')}</h2>
                             <p>{confirmMessage}</p>
                             <div className="form-actions">
                                 <button type="button" className="plain-action" onClick={() => resolveConfirm(false)}>
-                                    取消
+                                    {t('cancel')}
                                 </button>
                                 <button type="button" className="primary-action" onClick={() => resolveConfirm(true)}>
-                                    確認
+                                    {t('confirm')}
                                 </button>
                             </div>
                         </section>
@@ -1121,11 +1208,11 @@ function App() {
     );
 }
 
-async function extractOtpauthFromImageFile(file: File) {
+export async function extractOtpauthFromImageFile(file: File) {
     return extractOtpauthFromImageBlob(file);
 }
 
-async function extractOtpauthFromImageBlob(blob: Blob) {
+export async function extractOtpauthFromImageBlob(blob: Blob) {
     const bitmap = await createImageBitmap(blob);
     try {
         const canvas = document.createElement('canvas');
@@ -1147,11 +1234,11 @@ async function extractOtpauthFromImageBlob(blob: Blob) {
     }
 }
 
-function groupCode(code: string) {
+export function groupCode(code: string) {
     return code.replace(/(.{3})/g, '$1 ').trim();
 }
 
-function cleanError(value: string) {
+export function cleanError(value: string) {
     return value.replace(/^Error:\s*/, '').replace(/^main\.App\./, '');
 }
 

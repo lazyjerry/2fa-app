@@ -133,6 +133,7 @@ func viewForAccount(account Account) AccountView {
 		Algorithm: account.Algorithm,
 		Digits:    account.Digits,
 		Period:    account.Period,
+		Pinned:    account.Pinned,
 		CreatedAt: account.CreatedAt,
 		UpdatedAt: account.UpdatedAt,
 	}

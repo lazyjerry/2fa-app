@@ -34,13 +34,21 @@ export function GetSettings():Promise<main.Settings>;
 
 export function GetSetupState():Promise<main.SetupState>;
 
+export function ImportAccounts(arg1:string):Promise<main.ImportResult>;
+
+export function ImportAccountsFromFile():Promise<main.ImportResult>;
+
 export function ImportVault(arg1:string):Promise<main.ImportResult>;
 
 export function ImportVaultFromFile():Promise<main.ImportResult>;
 
 export function LockVault():Promise<void>;
 
+export function MoveAccount(arg1:string,arg2:string):Promise<void>;
+
 export function SaveSettings(arg1:main.Settings):Promise<main.Settings>;
+
+export function SetAccountPinned(arg1:string,arg2:boolean):Promise<main.AccountView>;
 
 export function SetLaunchScreenshotProtection(arg1:boolean):Promise<void>;
 

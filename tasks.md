@@ -24,20 +24,20 @@
 
 ## 功能完整度
 
-- [ ] 增加批次匯入常見 authenticator 匯出格式。
-- [ ] 增加帳號排序、釘選與分類管理。
+- [x] 增加批次匯入常見 authenticator 匯出格式。
+- [x] 增加帳號排序、釘選與分類管理。
 - [x] 增加重複帳號或重複 secret 偵測。
 - [x] 增加手動新增表單的即時 secret 格式驗證。
 - [x] 增加 QR 掃描失敗時的錯誤提示與重試狀態。
 - [ ] 增加 HOTP 支援評估；目前只支援 TOTP。
-- [ ] 增加多語系架構，至少保留繁體中文與英文文案。
+- [x] 增加多語系架構，至少保留繁體中文與英文文案。
 
 ## 測試
 
-- [ ] 補 backend 測試：密碼錯誤、vault 檔損毀、設定邊界值、刪除帳號。
-- [ ] 補 frontend component 或 E2E 測試：登入、新增、搜尋、複製、設定。
-- [ ] 補 camera scanner mock 測試，確認 `otpauth://` QR 可被正確匯入。
-- [ ] 補 macOS 手動測試清單，涵蓋 Intel / Apple Silicon。
+- [x] 補 backend 測試：密碼錯誤、vault 檔損毀、設定邊界值、刪除帳號。
+- [x] 補 frontend component 或 E2E 測試：登入、新增、搜尋、複製、設定。
+- [x] 補 camera scanner mock 測試，確認 `otpauth://` QR 可被正確匯入。（目前鏡頭模式已移除，以 QR image parser mock 覆蓋）
+- [x] 補 macOS 手動測試清單，涵蓋 Intel / Apple Silicon。
 
 ## 文件與發佈
 

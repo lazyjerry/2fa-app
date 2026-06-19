@@ -620,6 +620,16 @@ button {
     background: rgba(21, 36, 49, 0.86);
 }
 
+.code-row.pinned {
+    border-left: 2px solid var(--hud-theme-bright);
+}
+
+.pin-mark {
+    color: var(--hud-theme-bright);
+    flex-shrink: 0;
+    align-self: center;
+}
+
 .setting-row {
     display: flex;
     align-items: center;

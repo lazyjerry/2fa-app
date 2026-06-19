@@ -38,6 +38,7 @@ type Account struct {
 	Algorithm string    `json:"algorithm"`
 	Digits    int       `json:"digits"`
 	Period    int       `json:"period"`
+	Pinned    bool      `json:"pinned"`
 	CreatedAt time.Time `json:"createdAt"`
 	UpdatedAt time.Time `json:"updatedAt"`
 }
@@ -51,6 +52,7 @@ type AccountView struct {
 	Algorithm string    `json:"algorithm"`
 	Digits    int       `json:"digits"`
 	Period    int       `json:"period"`
+	Pinned    bool      `json:"pinned"`
 	CreatedAt time.Time `json:"createdAt"`
 	UpdatedAt time.Time `json:"updatedAt"`
 }

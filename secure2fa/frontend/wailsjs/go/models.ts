@@ -35,6 +35,7 @@ export namespace main {
 	    algorithm: string;
 	    digits: number;
 	    period: number;
+	    pinned: boolean;
 	    // Go type: time
 	    createdAt: any;
 	    // Go type: time
@@ -54,6 +55,7 @@ export namespace main {
 	        this.algorithm = source["algorithm"];
 	        this.digits = source["digits"];
 	        this.period = source["period"];
+	        this.pinned = source["pinned"];
 	        this.createdAt = this.convertValues(source["createdAt"], null);
 	        this.updatedAt = this.convertValues(source["updatedAt"], null);
 	    }
@@ -85,6 +87,7 @@ export namespace main {
 	    algorithm: string;
 	    digits: number;
 	    period: number;
+	    pinned: boolean;
 	    // Go type: time
 	    createdAt: any;
 	    // Go type: time
@@ -106,6 +109,7 @@ export namespace main {
 	        this.algorithm = source["algorithm"];
 	        this.digits = source["digits"];
 	        this.period = source["period"];
+	        this.pinned = source["pinned"];
 	        this.createdAt = this.convertValues(source["createdAt"], null);
 	        this.updatedAt = this.convertValues(source["updatedAt"], null);
 	        this.code = source["code"];

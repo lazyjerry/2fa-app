@@ -66,6 +66,14 @@ export function GetSetupState() {
   return window['go']['main']['App']['GetSetupState']();
 }
 
+export function ImportAccounts(arg1) {
+  return window['go']['main']['App']['ImportAccounts'](arg1);
+}
+
+export function ImportAccountsFromFile() {
+  return window['go']['main']['App']['ImportAccountsFromFile']();
+}
+
 export function ImportVault(arg1) {
   return window['go']['main']['App']['ImportVault'](arg1);
 }
@@ -78,8 +86,16 @@ export function LockVault() {
   return window['go']['main']['App']['LockVault']();
 }
 
+export function MoveAccount(arg1, arg2) {
+  return window['go']['main']['App']['MoveAccount'](arg1, arg2);
+}
+
 export function SaveSettings(arg1) {
   return window['go']['main']['App']['SaveSettings'](arg1);
+}
+
+export function SetAccountPinned(arg1, arg2) {
+  return window['go']['main']['App']['SetAccountPinned'](arg1, arg2);
 }
 
 export function SetLaunchScreenshotProtection(arg1) {

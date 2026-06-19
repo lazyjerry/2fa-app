@@ -107,3 +107,72 @@ func TestImportRejectsCorruptPayload(t *testing.T) {
 		t.Fatal("ImportVault() should reject a corrupt payload")
 	}
 }
+
+func TestImportAccountsFromBatchText(t *testing.T) {
+	app := NewAppWithStorage(t.TempDir())
+	if _, err := app.CreateVault(testPassword); err != nil {
+		t.Fatalf("CreateVault() error = %v", err)
+	}
+
+	payload := `
+otpauth://totp/GitHub:user@example.com?secret=JBSWY3DPEHPK3PXP&issuer=GitHub
+otpauth://totp/Google:user@example.com?secret=JBSWY3DPEHPK3PXQ&issuer=Google
+`
+
+	result, err := app.ImportAccounts(payload)
+	if err != nil {
+		t.Fatalf("ImportAccounts() error = %v", err)
+	}
+	if result.Total != 2 || result.Added != 2 || result.Skipped != 0 {
+		t.Fatalf("unexpected import result: %#v", result)
+	}
+
+	again, err := app.ImportAccounts(payload)
+	if err != nil {
+		t.Fatalf("ImportAccounts() second call error = %v", err)
+	}
+	if again.Total != 2 || again.Added != 0 || again.Skipped != 2 {
+		t.Fatalf("unexpected re-import result: %#v", again)
+	}
+}
+
+func TestImportAccountsFromBatchJSON(t *testing.T) {
+	app := NewAppWithStorage(t.TempDir())
+	if _, err := app.CreateVault(testPassword); err != nil {
+		t.Fatalf("CreateVault() error = %v", err)
+	}
+
+	payload := `{
+	  "accounts": [
+	    {
+	      "issuer": "Dropbox",
+	      "name": "me@example.com",
+	      "secret": "JBSWY3DPEHPK3PXR",
+	      "algorithm": "SHA1",
+	      "digits": 6,
+	      "period": 30
+	    },
+	    {
+	      "type": "hotp",
+	      "issuer": "Unsupported",
+	      "name": "ignored",
+	      "secret": "JBSWY3DPEHPK3PXS"
+	    }
+	  ]
+	}`
+
+	result, err := app.ImportAccounts(payload)
+	if err != nil {
+		t.Fatalf("ImportAccounts() error = %v", err)
+	}
+	if result.Total != 1 || result.Added != 1 || result.Skipped != 0 {
+		t.Fatalf("unexpected import result: %#v", result)
+	}
+}
+
+func TestImportAccountsRejectsUnsupportedFormat(t *testing.T) {
+	app := newUnlockedApp(t)
+	if _, err := app.ImportAccounts("{\"accounts\":[{\"foo\":\"bar\"}]}"); err == nil {
+		t.Fatal("ImportAccounts() should reject unsupported payload")
+	}
+}
